@@ -13,9 +13,20 @@
     kinematics_parameters_file="$(find ur_description)/config/ur3/default_kinematics.yaml"
     physical_parameters_file="$(find ur_description)/config/ur3/physical_parameters.yaml"
     visual_parameters_file="$(find ur_description)/config/ur3/visual_parameters.yaml"
-    sim_gazebo="true">
+    sim_gazebo="true"
+    initial_positions="${dict(shoulder_pan_joint=0.0,shoulder_lift_joint=-1.57,elbow_joint=-1.57,wrist_1_joint=-1.57,wrist_2_joint=1.57,wrist_3_joint=0.0)}">
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:ur_robot>
+
+  <!-- Tat gravity cac link canh tay trong thoi gian controller chua bat -->
+  <gazebo reference="base_link_inertia"><gravity>false</gravity></gazebo>
+  <gazebo reference="shoulder_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="upper_arm_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="forearm_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="wrist_1_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="wrist_2_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="wrist_3_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="gripper_base_link"><gravity>false</gravity></gazebo>
 
   <!-- Nối cơ khí simple_gripper vào tool0 -->
   <xacro:include filename="simple_gripper.xacro"/>

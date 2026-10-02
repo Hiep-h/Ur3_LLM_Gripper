@@ -103,12 +103,22 @@ def generate_launch_description():
     srdf_xacro = os.path.join(ur_share, "srdf", "ur.srdf.xacro")
     robot_description_semantic = {
         "robot_description_semantic": ParameterValue(
-            Command(["xacro ", srdf_xacro, " name:=ur"]), value_type=str
+            Command(["xacro ", srdf_xacro, " name:=ur3_with_gripper"]), value_type=str
         )
     }
 
     kinematics_yaml = load_yaml(os.path.join(ur_share, "config", "kinematics.yaml"))
-    robot_description_kinematics = {"robot_description_kinematics": kinematics_yaml}
+    # kinematics.yaml dung group "ur_manipulator"; SRDF cua chung ta tao group
+    # "ur3_with_gripper_manipulator" (name:=ur3_with_gripper). Phai remap dung ten.
+    _kin_inner = (kinematics_yaml.get("/**", {})
+                  .get("ros__parameters", {})
+                  .get("robot_description_kinematics", {}))
+    _solver_cfg = _kin_inner.get("ur_manipulator", {})
+    robot_description_kinematics = {
+        "robot_description_kinematics": {
+            "ur3_with_gripper_manipulator": _solver_cfg
+        }
+    }
 
     ompl_planning_yaml = load_yaml(os.path.join(ur_share, "config", "ompl_planning.yaml"))
     ompl_planning_pipeline_config = {
@@ -225,8 +235,8 @@ def generate_launch_description():
         camera_tf,
         TimerAction(period=3.0, actions=[spawn_robot]),
         TimerAction(period=6.0, actions=[move_group]),
-        TimerAction(period=10.0, actions=[load_joint_state_broadcaster, load_arm_controller]),
-        TimerAction(period=11.0, actions=[load_gripper_controller]),
+        TimerAction(period=3.5, actions=[load_joint_state_broadcaster, load_arm_controller]),
+        TimerAction(period=4.0, actions=[load_gripper_controller]),
         TimerAction(period=12.0, actions=spawn_scene),
         TimerAction(period=15.0, actions=[scene_node, detector_node]),
     ])
