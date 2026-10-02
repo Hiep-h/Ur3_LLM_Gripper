@@ -17,11 +17,12 @@ park_positions:
   park_3: [0.30, -0.30, 0.005]
 
 # Vi tri BAN DAU cua cac cube (chi dung de spawn trong Gazebo).
-# Robot KHONG doc file nay: toa do cube lay tu camera (perception.detect_objects).
-# Kich ban demo: blue_cube nam san trong zone_b de tao xung dot.
+# Robot KHONG doc muc nay: toa do cube lay tu camera (perception.detect_objects).
+# Kich ban demo Bai 03: zone_a=red, zone_b=blue, zone_c=green; yellow/purple ngoai zone.
+# "Put the red cube in Zone B" -> zone_b dang bi blue_cube chiem -> don sang park_1 truoc.
 objects:
-  red_cube:    [0.28,  0.18, 0.025]
-  yellow_cube: [0.28,  0.06, 0.025]
-  green_cube:  [0.28, -0.06, 0.025]
-  purple_cube: [0.28, -0.18, 0.025]
+  red_cube:    [0.40,  0.15, 0.025]
   blue_cube:   [0.40,  0.00, 0.025]
+  green_cube:  [0.40, -0.15, 0.025]
+  yellow_cube: [0.28,  0.06, 0.025]
+  purple_cube: [0.28, -0.06, 0.025]
