@@ -2,14 +2,16 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <!-- Gripper song song 2 ngon truot (khong dung <mimic>, chay duoc tren Gazebo Classic).
-       Hinh dang: adapter + than Robotiq 2F-85 (mesh MIT, xem meshes/robotiq_2f_85/LICENSE.*)
-       Chi dung mesh cho VISUAL; collision la hop don gian de MoveIt/ODE on dinh.
+       Hinh dang gripper - adapter + than Robotiq 2F-85 (mesh MIT, xem thu muc meshes/robotiq_2f_85)
+       Chi dung mesh cho VISUAL, collision la hop don gian de MoveIt/ODE on dinh.
+       LUU Y - khong de chuoi hai cham + dau cach trong comment cua file xacro, vi rcl doc
+       robot_description nhu YAML nen se bi loi parser va controller_manager khong khoi dong.
        Mesh Robotiq mo theo truc x -> xoay 90 do quanh z de ngon mo theo truc y cua tool0. -->
 
   <xacro:property name="finger_len"    value="0.06"/>   <!-- doc truc z (dai) -->
   <xacro:property name="finger_wid"    value="0.02"/>   <!-- doc truc x -->
   <xacro:property name="finger_thk"    value="0.012"/>  <!-- doc truc y (huong mo) -->
-  <xacro:property name="finger_y0"     value="0.021"/>  <!-- tam ngon khi dong (q=0): mat trong o +-0.015 -->
+  <xacro:property name="finger_y0"     value="0.021"/>  <!-- tam ngon khi dong (q=0), mat trong o +-0.015 -->
   <xacro:property name="finger_z"      value="0.134"/>  <!-- tam ngon duoi tool0; ngon nam duoi than 0.104..0.164 -->
   <xacro:property name="body_top"      value="0.0139"/> <!-- adapter cao 0.0139 -->
   <xacro:property name="body_bottom"   value="0.100"/>
