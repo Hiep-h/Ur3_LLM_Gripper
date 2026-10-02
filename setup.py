@@ -15,6 +15,7 @@ setup(
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
         (os.path.join('share', package_name, 'worlds'), glob('worlds/*.world')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.xacro')),
+        (os.path.join('share', package_name, 'meshes', 'robotiq_2f_85'), glob('meshes/robotiq_2f_85/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

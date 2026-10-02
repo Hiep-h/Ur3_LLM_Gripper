@@ -29,9 +29,11 @@ HOME_JOINTS = {
 
 GRASP_ORIENTATION = (0.7071, -0.7071, 0.0, 0.0)
 
-# Cao do tool0 (base_link) khi gripper om vua cube 4cm / tha cube xuong ban
-PICK_Z = 0.085
-PLACE_Z = 0.09
+# Cao do tool0 (base_link) khi gripper om vua cube 4cm / tha cube xuong ban.
+# Ngon gripper nam 0.104..0.164 duoi tool0 (xem urdf/simple_gripper.xacro):
+# PICK_Z = 0.17 -> ngon cao ~0.006..0.066, than gripper cach dinh cube (0.04) ~2.6cm.
+PICK_Z = 0.17
+PLACE_Z = 0.175
 PRE_GRASP_DZ = 0.05
 LIFT_DZ = 0.08
 
