@@ -8,7 +8,6 @@
       <uri>model://sun</uri>
     </include>
 
-    <!-- Plugin bat buoc de sinh ra service /gazebo/set_entity_state -->
     <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
       <ros>
         <namespace>/gazebo</namespace>
@@ -21,5 +20,49 @@
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>
     </physics>
+
+    <!-- Camera treo lơ lửng trên trần, KHÔNG CẦN CỘT CẮM VÀO BÀN -->
+    <model name="overhead_camera">
+      <static>true</static>
+      <pose>0.34 0 1.0 0 1.5708 0</pose>
+      <link name="camera_link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.05 0.05 0.03</size></box>
+          </geometry>
+          <material>
+            <ambient>0.1 0.1 0.1 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+          </material>
+        </visual>
+        <sensor name="overhead_cam_sensor" type="camera">
+          <camera>
+            <horizontal_fov>1.047</horizontal_fov>
+            <image>
+              <width>800</width>
+              <height>600</height>
+            </image>
+            <clip>
+              <near>0.05</near>
+              <far>5.0</far>
+            </clip>
+          </camera>
+          <always_on>true</always_on>
+          <update_rate>10</update_rate>
+          <visualize>false</visualize> <!-- Tắt tia nón trắng cho gọn mắt -->
+
+          <plugin name="overhead_camera_controller" filename="libgazebo_ros_camera.so">
+            <ros>
+              <namespace>/overhead_cam</namespace>
+              <remapping>image_raw:=image_raw</remapping>
+              <remapping>camera_info:=camera_info</remapping>
+            </ros>
+            <camera_name>overhead_cam</camera_name>
+            <frame_name>overhead_cam_optical_frame</frame_name>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+
   </world>
 </sdf>

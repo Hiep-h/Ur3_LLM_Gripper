@@ -1,0 +1,89 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="finger_length" value="0.06"/>
+  <xacro:property name="finger_width"  value="0.02"/>
+  <xacro:property name="finger_height" value="0.015"/>
+  <xacro:property name="base_size"     value="0.05"/>
+  <xacro:property name="max_open"      value="0.04"/>
+
+  <!-- BASE GRIPPER -->
+  <link name="gripper_base_link">
+    <visual>
+      <geometry><box size="${base_size} ${base_size} 0.03"/></geometry>
+      <material name="grey"><color rgba="0.3 0.3 0.3 1"/></material>
+    </visual>
+    <collision>
+      <geometry><box size="${base_size} ${base_size} 0.03"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.3"/>
+      <inertia ixx="0.0003" iyy="0.0003" izz="0.0003" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <joint name="gripper_base_joint" type="fixed">
+    <parent link="tool0"/>
+    <child  link="gripper_base_link"/>
+    <origin xyz="0 0 0.015" rpy="0 0 0"/>
+  </joint>
+
+  <!-- LEFT FINGER -->
+  <link name="left_finger_link">
+    <visual>
+      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
+      <material name="dark_grey"><color rgba="0.15 0.15 0.15 1"/></material>
+    </visual>
+    <collision>
+      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.00002" iyy="0.00002" izz="0.00002" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <joint name="left_finger_joint" type="prismatic">
+    <parent link="gripper_base_link"/>
+    <child  link="left_finger_link"/>
+    <origin xyz="0 0.025 0.04" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0.0" upper="${max_open}" effort="50" velocity="0.05"/>
+    <dynamics damping="1.0" friction="0.5"/>
+  </joint>
+
+  <!-- RIGHT FINGER -->
+  <link name="right_finger_link">
+    <visual>
+      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision>
+      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.00002" iyy="0.00002" izz="0.00002" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <joint name="right_finger_joint" type="prismatic">
+    <parent link="gripper_base_link"/>
+    <child  link="right_finger_link"/>
+    <origin xyz="0 -0.025 0.04" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0.0" upper="${max_open}" effort="50" velocity="0.05"/>
+    <dynamics damping="1.0" friction="0.5"/>
+  </joint>
+
+  <!-- GAZEBO CONTACT FRICTION -->
+  <gazebo reference="left_finger_link">
+    <mu1>50.0</mu1><mu2>50.0</mu2>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <gazebo reference="right_finger_link">
+    <mu1>50.0</mu1><mu2>50.0</mu2>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+</robot>
