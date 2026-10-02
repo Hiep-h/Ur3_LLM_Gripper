@@ -4,6 +4,7 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, TimerAction
 from launch_ros.actions import Node
 from launch.substitutions import Command
+from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 
 PKG = "ur3_llm_control"
@@ -93,12 +94,17 @@ def generate_launch_description():
     xacro_path = os.path.join(pkg_share, "urdf", "ur3_with_gripper.urdf.xacro")
     world_path = os.path.join(pkg_share, "worlds", "ur_scene.world")
 
-    robot_description = {"robot_description": Command(["xacro ", xacro_path])}
+    robot_description = {
+        "robot_description": ParameterValue(Command(["xacro ", xacro_path]), value_type=str)
+    }
+    scene = load_yaml(os.path.join(pkg_share, "config", "scene.yaml"))
 
     # Generate SRDF tu template xacro
     srdf_xacro = os.path.join(ur_share, "srdf", "ur.srdf.xacro")
     robot_description_semantic = {
-        "robot_description_semantic": Command(["xacro ", srdf_xacro, " name:=ur"])
+        "robot_description_semantic": ParameterValue(
+            Command(["xacro ", srdf_xacro, " name:=ur"]), value_type=str
+        )
     }
 
     kinematics_yaml = load_yaml(os.path.join(ur_share, "config", "kinematics.yaml"))
@@ -169,20 +175,37 @@ def generate_launch_description():
         output="screen",
     )
 
-    spawn_scene = [
-        _spawn_box("work_table", 0.35, 0.0, -0.025, (1.0, 0.8, 0.05), (0.55, 0.35, 0.2, 1.0)),
-        _spawn_box("red_cube",    0.28,  0.15, 0.025, (0.04, 0.04, 0.04), (1.0, 0.0, 0.0, 1.0), static=False, physical=True),
-        _spawn_box("yellow_cube", 0.28,  0.00, 0.025, (0.04, 0.04, 0.04), (1.0, 1.0, 0.0, 1.0), static=False, physical=True),
-        _spawn_box("blue_cube",   0.28, -0.15, 0.025, (0.04, 0.04, 0.04), (0.0, 0.0, 1.0, 1.0), static=False, physical=True),
-        _spawn_box("zone_a", 0.40,  0.15, 0.005, (0.08, 0.08, 0.005), (1.0, 0.6, 0.6, 0.7)),
-        _spawn_box("zone_b", 0.40,  0.00, 0.005, (0.08, 0.08, 0.005), (1.0, 1.0, 0.6, 0.7)),
-        _spawn_box("zone_c", 0.40, -0.15, 0.005, (0.08, 0.08, 0.005), (0.6, 0.6, 1.0, 0.7)),
-        _spawn_box("temp_zone", 0.34, 0.30, 0.005, (0.08, 0.08, 0.005), (0.7, 0.7, 0.7, 0.6)),
-    ]
+    CUBE_SIZE = (0.04, 0.04, 0.04)
+    CUBE_COLORS = {
+        "red_cube":    (1.0, 0.0, 0.0, 1.0),
+        "yellow_cube": (1.0, 1.0, 0.0, 1.0),
+        "green_cube":  (0.0, 1.0, 0.0, 1.0),
+        "purple_cube": (0.5, 0.0, 0.5, 1.0),
+        "blue_cube":   (0.0, 0.0, 1.0, 1.0),
+    }
+    ZONE_COLORS = {
+        "zone_a": (1.0, 0.6, 0.6, 0.7),
+        "zone_b": (1.0, 1.0, 0.6, 0.7),
+        "zone_c": (0.6, 0.6, 1.0, 0.7),
+    }
 
+    table = scene["table"]
+    spawn_scene = [_spawn_box("work_table", *table["center"], tuple(table["size"]), (0.55, 0.35, 0.2, 1.0))]
+    for name, (x, y, z) in scene["zones"].items():
+        spawn_scene.append(_spawn_box(name, x, y, z, (0.08, 0.08, 0.005), ZONE_COLORS[name]))
+    # Diem do tam: o mau xam
+    for name, (x, y, z) in scene["park_positions"].items():
+        spawn_scene.append(_spawn_box(name, x, y, z, (0.08, 0.08, 0.005), (0.7, 0.7, 0.7, 0.6)))
+    # 5 cube; blue_cube nam san trong zone_b -> xung dot ban dau
+    for name, (x, y, z) in scene["objects"].items():
+        spawn_scene.append(_spawn_box(name, x, y, z, CUBE_SIZE, CUBE_COLORS[name],
+                                      static=False, physical=True))
+
+    # Optical frame cua camera nhin thang xuong (z xuong, x = -y_base, y = -x_base)
     camera_tf = Node(
         package="tf2_ros", executable="static_transform_publisher",
-        arguments=["0.34", "0", "1.0", "0", "1.5708", "0", "base_link", "overhead_cam_optical_frame"],
+        arguments=["0.34", "0.0", "1.0", "-1.5708", "0.0", "3.14159",
+                   "base_link", "overhead_cam_optical_frame"],
         output="screen",
     )
 
@@ -196,11 +219,6 @@ def generate_launch_description():
         output="screen", parameters=[{"use_sim_time": True}],
     )
 
-    executor_node = Node(
-        package=PKG, executable="skill_executor", name="skill_executor",
-        output="screen", parameters=[{"use_sim_time": True}],
-    )
-
     return LaunchDescription([
         gazebo,
         rsp_node,
@@ -211,5 +229,4 @@ def generate_launch_description():
         TimerAction(period=11.0, actions=[load_gripper_controller]),
         TimerAction(period=12.0, actions=spawn_scene),
         TimerAction(period=15.0, actions=[scene_node, detector_node]),
-        TimerAction(period=18.0, actions=[executor_node]),
     ])

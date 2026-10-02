@@ -52,11 +52,8 @@
           <visualize>false</visualize> <!-- Tắt tia nón trắng cho gọn mắt -->
 
           <plugin name="overhead_camera_controller" filename="libgazebo_ros_camera.so">
-            <ros>
-              <namespace>/overhead_cam</namespace>
-              <remapping>image_raw:=image_raw</remapping>
-              <remapping>camera_info:=camera_info</remapping>
-            </ros>
+            <!-- Topic: /overhead_cam/image_raw va /overhead_cam/camera_info
+                 (khong dat <namespace>, tranh bi lap /overhead_cam/overhead_cam/...) -->
             <camera_name>overhead_cam</camera_name>
             <frame_name>overhead_cam_optical_frame</frame_name>
           </plugin>

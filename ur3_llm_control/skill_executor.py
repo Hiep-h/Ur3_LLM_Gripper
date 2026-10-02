@@ -11,6 +11,7 @@ from ur3_llm_control.perception import PerceptionInterface
 from ur3_llm_control.llm_planner import LLMPlanner
 from ur3_llm_control.task_validator import validate_plan
 from ur3_llm_control.robot_skills import RobotSkills, SkillStatus
+from ur3_llm_control.zone_manager import ZoneManager, expand_plan_with_conflict_resolution
 
 def load_yaml(path: str) -> dict:
     with open(path, "r") as f:
@@ -39,42 +40,29 @@ class SkillExecutorNode(Node):
             zone_mapping=student_cfg.get("zone_mapping", {}),
         )
 
+        self.perception = PerceptionInterface(self)
+
+        zones = scene_cfg.get("zones", {})
+        parks = scene_cfg.get("park_positions", {})
+        self.zone_manager = ZoneManager(zones, parks)
+
         self.skills = RobotSkills(
             self,
+            perception=self.perception,
+            landmarks={**zones, **parks},
             group_name="ur_manipulator",
             ee_link="tool0",
             base_frame=scene_cfg.get("frame_id", "base_link"),
-            approach_offset_z=scene_cfg.get("approach_offset_z", 0.15),
         )
 
-        self.perception = PerceptionInterface(self)
-
     def resolve_with_camera(self, steps: list[dict]) -> list[dict]:
-        resolved = []
-        i = 0
-        while i < len(steps):
-            step = steps[i]
-            if step["skill"] == "pick" and i + 1 < len(steps) and steps[i+1]["skill"] == "place":
-                obj = step["object"]
-                place_step = steps[i + 1]
-                target_zone = place_step["zone"]
-
-                occupant = self.perception.check_zone(target_zone)
-                if occupant is not None and occupant != obj:
-                    free_zone = self.perception.find_free_position(exclude_zones={target_zone})
-                    if free_zone is None:
-                        raise RuntimeError(f"Camera: khong tim thay vi tri trong de don '{occupant}'")
-                    print(f"CAMERA: check_zone({target_zone}) -> phat hien '{occupant}' dang chiem cho")
-                    resolved.append({"skill": "pick", "object": occupant})
-                    resolved.append({"skill": "place", "object": occupant, "zone": free_zone})
-
-                resolved.append(step)
-                resolved.append(place_step)
-                i += 2
-            else:
-                resolved.append(step)
-                i += 1
-        return resolved
+        """Doc trang thai thuc tu camera, roi mo phong tung buoc qua ZoneManager
+        de tu chen buoc don vat can sang diem do (park_*)."""
+        self.skills.home()  # tay khong che camera
+        detected = self.perception.detect_objects()
+        print(f"CAMERA: {detected}")
+        self.zone_manager.sync_from_camera(detected)
+        return expand_plan_with_conflict_resolution(steps, self.zone_manager)
 
     def run_command(self, user_command: str):
         print(f"\nUSER COMMAND: {user_command}")
@@ -102,7 +90,7 @@ class SkillExecutorNode(Node):
             return
 
         if resolved_steps != plan["plan"]:
-            print(f"RESOLVED PLAN (camera bo sung buoc don): {resolved_steps}")
+            print(f"RESOLVED PLAN (ZoneManager bo sung buoc don): {resolved_steps}")
 
         print("EXECUTION:")
         task_ok = True

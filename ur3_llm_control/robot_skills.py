@@ -9,8 +9,7 @@ from moveit_msgs.msg import Constraints, PositionConstraint, OrientationConstrai
 from shape_msgs.msg import SolidPrimitive
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
-import tf2_ros
-from tf2_ros import TransformException
+from sensor_msgs.msg import JointState
 
 class SkillStatus(Enum):
     SUCCESS = "SUCCESS"
@@ -30,17 +29,24 @@ HOME_JOINTS = {
 
 GRASP_ORIENTATION = (0.7071, -0.7071, 0.0, 0.0)
 
+# Cao do tool0 (base_link) khi gripper om vua cube 4cm / tha cube xuong ban
+PICK_Z = 0.085
+PLACE_Z = 0.09
+PRE_GRASP_DZ = 0.05
+LIFT_DZ = 0.08
+
 class RobotSkills:
-    def __init__(self, node: Node, group_name="ur_manipulator", ee_link="tool0",
-                 base_frame="base_link", approach_offset_z=0.15):
+    def __init__(self, node: Node, perception, landmarks: dict,
+                 group_name="ur_manipulator", ee_link="tool0", base_frame="base_link"):
         self.node = node
         self.group_name = group_name
         self.ee_link = ee_link
         self.base_frame = base_frame
-        self.approach_offset_z = approach_offset_z
+        self.perception = perception
+        self.landmarks = landmarks  # zone / diem do co dinh: {name: [x, y, z]}
 
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, node)
+        self._finger_pos = {}
+        node.create_subscription(JointState, "/joint_states", self._on_joint_state, 10)
 
         self._move_client = ActionClient(node, MoveGroup, "/move_action")
         self._gripper_client = ActionClient(node, FollowJointTrajectory, "/gripper_controller/follow_joint_trajectory")
@@ -76,17 +82,17 @@ class RobotSkills:
     def close_gripper(self) -> bool:
         return self._send_gripper(0.0)
 
-    def _lookup_pose(self, frame_name: str):
-        try:
-            t = self.tf_buffer.lookup_transform(
-                self.base_frame, frame_name,
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=2.0)
-            )
-            p = t.transform.translation
-            return (p.x, p.y, p.z)
-        except TransformException:
-            return None
+    def _on_joint_state(self, msg: JointState):
+        for name, pos in zip(msg.name, msg.position):
+            if name in ("left_finger_joint", "right_finger_joint"):
+                self._finger_pos[name] = pos
+
+    def _verify_grasp(self) -> bool:
+        """Cube 4cm chan khong cho 2 ngon khep het (q ~ 0.005); q ~ 0 nghia la gap hut."""
+        time.sleep(0.5)
+        if len(self._finger_pos) < 2:
+            return True  # khong co du lieu -> khong ket luan la hut
+        return all(0.002 < p < 0.035 for p in self._finger_pos.values())
 
     def _move_to_joint(self, joint_dict: dict) -> SkillStatus:
         if not self._move_client.wait_for_server(timeout_sec=5.0):
@@ -176,52 +182,58 @@ class RobotSkills:
     def home(self) -> SkillStatus:
         return self._move_to_joint(HOME_JOINTS)
 
+    def _move_xyz(self, x, y, z) -> SkillStatus:
+        return self._move_to_pose(x, y, z, *GRASP_ORIENTATION)
+
     def pick(self, object_name: str) -> SkillStatus:
-        xyz = self._lookup_pose(object_name)
-        if xyz is None:
-            return SkillStatus.INVALID_OBJECT
-
-        x, y, z = xyz
-        qx, qy, qz, qw = GRASP_ORIENTATION
-
-        self.open_gripper()
-
-        # Approach
-        st = self._move_to_pose(x, y, z + self.approach_offset_z, qx, qy, qz, qw)
+        # Ve home truoc khi quan sat de tay robot khong che camera
+        st = self.home()
         if st != SkillStatus.SUCCESS:
             return st
 
-        # Ha tay xuong gap
-        st = self._move_to_pose(x, y, z + 0.05, qx, qy, qz, qw)
+        # Toa do cube lay truc tiep tu camera (khong dung TF tinh)
+        try:
+            detected = self.perception.detect_objects()
+        except RuntimeError as e:
+            self.node.get_logger().error(str(e))
+            return SkillStatus.FAILED
+        if object_name not in detected:
+            self.node.get_logger().error(f"Camera khong nhin thay {object_name}")
+            return SkillStatus.INVALID_OBJECT
+        x, y = detected[object_name]
+
+        self.open_gripper()
+
+        st = self._move_xyz(x, y, PICK_Z + PRE_GRASP_DZ)
+        if st != SkillStatus.SUCCESS:
+            return st
+        st = self._move_xyz(x, y, PICK_Z)
         if st != SkillStatus.SUCCESS:
             return st
 
         self.close_gripper()
-        time.sleep(0.5)
+        if not self._verify_grasp():
+            self.node.get_logger().warn(f"Co the da gap hut {object_name}")
+            self.open_gripper()
+            self._move_xyz(x, y, PICK_Z + LIFT_DZ)
+            return SkillStatus.FAILED
 
-        # Retract
-        return self._move_to_pose(x, y, z + self.approach_offset_z, qx, qy, qz, qw)
+        return self._move_xyz(x, y, PICK_Z + LIFT_DZ)
 
     def place(self, object_name: str, zone_name: str) -> SkillStatus:
-        xyz = self._lookup_pose(zone_name)
-        if xyz is None:
+        pos = self.landmarks.get(zone_name)
+        if pos is None:
             return SkillStatus.INVALID_ZONE
+        x, y = pos[0], pos[1]
 
-        x, y, z = xyz
-        qx, qy, qz, qw = GRASP_ORIENTATION
-
-        # Approach zone
-        st = self._move_to_pose(x, y, z + self.approach_offset_z, qx, qy, qz, qw)
+        st = self._move_xyz(x, y, PLACE_Z + PRE_GRASP_DZ)
         if st != SkillStatus.SUCCESS:
             return st
-
-        # Ha xuong dat
-        st = self._move_to_pose(x, y, z + 0.05, qx, qy, qz, qw)
+        st = self._move_xyz(x, y, PLACE_Z)
         if st != SkillStatus.SUCCESS:
             return st
 
         self.open_gripper()
         time.sleep(0.5)
 
-        # Retract
-        return self._move_to_pose(x, y, z + self.approach_offset_z, qx, qy, qz, qw)
+        return self._move_xyz(x, y, PLACE_Z + LIFT_DZ)

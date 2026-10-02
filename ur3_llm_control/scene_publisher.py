@@ -26,25 +26,28 @@ class ScenePublisher(Node):
         self._publish_all_tf()
         self._add_collision_boxes()
 
-        self.get_logger().info("Scene publisher: da publish TF cho tat ca object/zone")
+        self.get_logger().info("Scene publisher: da publish TF cho ban/zone/diem do (khong co cube)")
 
-    def _make_transform(self, frame_name: str, xyz: dict) -> TransformStamped:
+    def _make_transform(self, frame_name: str, xyz) -> TransformStamped:
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = self.base_frame
         t.child_frame_id = frame_name
-        t.transform.translation.x = float(xyz["x"])
-        t.transform.translation.y = float(xyz["y"])
-        t.transform.translation.z = float(xyz["z"])
+        t.transform.translation.x = float(xyz[0])
+        t.transform.translation.y = float(xyz[1])
+        t.transform.translation.z = float(xyz[2])
         t.transform.rotation.w = 1.0
         return t
 
     def _publish_all_tf(self):
+        # CHI phat TF cho moc co dinh (ban, zone, diem do).
+        # Tuyet doi KHONG phat TF tinh cho cube: vi tri cube lay tu camera.
         transforms = []
-        for name, xyz in self.scene_cfg.get("objects", {}).items():
-            transforms.append(self._make_transform(name, xyz))
         for name, xyz in self.scene_cfg.get("zones", {}).items():
             transforms.append(self._make_transform(name, xyz))
+        for name, xyz in self.scene_cfg.get("park_positions", {}).items():
+            transforms.append(self._make_transform(name, xyz))
+        transforms.append(self._make_transform("work_table", self.scene_cfg["table"]["center"]))
         self.broadcaster.sendTransform(transforms)
 
     def _add_collision_boxes(self):
@@ -70,9 +73,10 @@ class ScenePublisher(Node):
             co.primitive_poses = [pose]
             return co
 
-        objects = []
-        
-        objects.append(make_box("work_table", 0.35, 0.0, -0.04, 1.0, 0.8, 0.04))
+        table = self.scene_cfg["table"]
+        cx, cy, cz = table["center"]
+        sx, sy, sz = table["size"]
+        objects = [make_box("work_table", cx, cy, cz, sx, sy, sz)]
 
         scene = PlanningScene()
         scene.is_diff = True

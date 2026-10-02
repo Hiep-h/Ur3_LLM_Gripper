@@ -4,7 +4,7 @@ Dự án điều khiển cánh tay robot công nghiệp Universal Robots UR3 tro
 
 ## Tính năng chính
 - **Natural Language Task Planning:** Tự động giải mã câu lệnh ngôn ngữ tự nhiên tiếng Việt/Anh thành chuỗi kỹ năng thao tác (pick, place, home).
-- **Conflict Resolution (Deadlock Handling):** Tự động phát hiện và giải quyết xung đột khi vùng đích đã bị chiếm bằng cách dọn tạm vật thể sang temp_zone.
+- **Conflict Resolution (Deadlock Handling):** Tự động phát hiện và giải quyết xung đột khi vùng đích đã bị chiếm bằng cách dọn tạm vật thể sang điểm đỗ tạm (park_1..3).
 - **Motion Planning & Collision Avoidance:** Quy hoạch quỹ đạo qua MoveIt 2 (OMPL RRTConnect), đảm bảo an toàn động học và giới hạn khớp.
 - **Gazebo Dynamic Visual Sync:** Đồng bộ vị trí vật thể theo tay gắp ảo trong điều kiện mô phỏng thời gian thực.
 
