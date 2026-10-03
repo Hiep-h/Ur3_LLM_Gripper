@@ -74,7 +74,7 @@ class RobotSkills:
         return future.result()
 
     def _send_gripper(self, opening: float, duration_sec: float = 1.0) -> bool:
-        if not self._gripper_client.wait_for_server(timeout_sec=5.0):
+        if not self._gripper_client.wait_for_server(timeout_sec=20.0):
             return False
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = ["left_finger_joint", "right_finger_joint"]
@@ -109,7 +109,7 @@ class RobotSkills:
         return all(0.002 < p < 0.035 for p in self._finger_pos.values())
 
     def _move_to_joint(self, joint_dict: dict) -> SkillStatus:
-        if not self._move_client.wait_for_server(timeout_sec=5.0):
+        if not self._move_client.wait_for_server(timeout_sec=20.0):
             return SkillStatus.FAILED
 
         goal = MoveGroup.Goal()
@@ -148,7 +148,7 @@ class RobotSkills:
         return SkillStatus.SUCCESS
 
     def _move_to_pose(self, x, y, z, qx, qy, qz, qw) -> SkillStatus:
-        if not self._move_client.wait_for_server(timeout_sec=5.0):
+        if not self._move_client.wait_for_server(timeout_sec=20.0):
             return SkillStatus.FAILED
 
         goal = MoveGroup.Goal()
