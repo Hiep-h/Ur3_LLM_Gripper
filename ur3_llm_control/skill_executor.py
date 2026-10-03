@@ -28,6 +28,11 @@ class SkillExecutorNode(Node):
         self.declare_parameter("llm_base_url", os.environ.get("LLM_BASE_URL", "http://localhost:20128/v1"))
         self.declare_parameter("llm_api_key", os.environ.get("LLM_API_KEY", ""))
         self.declare_parameter("llm_model", os.environ.get("LLM_MODEL", "hiep-combo"))
+        # Che do chay mot lan roi thoat (khong can nhap tay):
+        #   -p command:="Put the red cube in Zone B."  (qua LLM)
+        #   -p test_skill:=home|open|close             (goi thang skill, khong qua LLM, de debug MoveIt)
+        self.declare_parameter("command", "")
+        self.declare_parameter("test_skill", "")
 
         base_url = self.get_parameter("llm_base_url").value
         api_key = self.get_parameter("llm_api_key").value
@@ -135,6 +140,19 @@ def main():
         print("WARN: khong mo duoc gripper luc khoi dong (gripper_controller chua san sang?)")
 
     try:
+        test_skill = node.get_parameter("test_skill").value
+        one_shot = node.get_parameter("command").value
+        if test_skill:
+            fn = {"home": node.skills.home, "open": node.skills.open_gripper,
+                  "close": node.skills.close_gripper}.get(test_skill)
+            if fn is None:
+                print(f"test_skill khong hop le: {test_skill} (home|open|close)")
+            else:
+                print(f"TEST {test_skill}: {fn()}")
+            return
+        if one_shot:
+            node.run_command(one_shot)
+            return
         while rclpy.ok():
             cmd = input("\nNhap lenh (hoac 'exit'): ").strip()
             if cmd.lower() == "exit":
