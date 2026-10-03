@@ -10,6 +10,10 @@ from shape_msgs.msg import SolidPrimitive
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 from sensor_msgs.msg import JointState
+try:
+    from gazebo_msgs.msg import ModelStates
+except ImportError:  # chi dung de debug, khong bat buoc
+    ModelStates = None
 
 class SkillStatus(Enum):
     SUCCESS = "SUCCESS"
@@ -49,8 +53,8 @@ PLACE_Z = 0.175
 PRE_GRASP_DZ = 0.05
 # Ngon gripper: mat trong o +-(0.015 + q). Cube 4cm (nua be rong 0.02) cham ngon o q = 0.005.
 FINGER_OPEN = 0.04
-FINGER_CLOSE = 0.004   # ep nhe ~1mm moi ben
-GRASP_MIN_Q = 0.0043   # q trung binh >= nguong nay nghia la co cube chan giua
+FINGER_CLOSE = 0.0035  # ep nhe ~1.5mm moi ben
+GRASP_MIN_SUM = 0.0090  # tong q hai ngon >= nguong nay nghia la co cube chan giua
 LIFT_DZ = 0.08
 
 class RobotSkills:
@@ -65,6 +69,11 @@ class RobotSkills:
 
         self._finger_pos = {}
         node.create_subscription(JointState, "/joint_states", self._on_joint_state, 10)
+
+        # CHI DE DEBUG: do cao that cua cube trong Gazebo (khong dung de lap ke hoach/quyet dinh).
+        self._model_z = {}
+        if ModelStates is not None:
+            node.create_subscription(ModelStates, "/gazebo/model_states", self._on_model_states, 5)
 
         self._move_client = ActionClient(node, MoveGroup, "/move_action")
         self._gripper_client = ActionClient(node, FollowJointTrajectory, "/gripper_controller/follow_joint_trajectory")
@@ -108,16 +117,32 @@ class RobotSkills:
             if name in ("left_finger_joint", "right_finger_joint"):
                 self._finger_pos[name] = pos
 
+    def _on_model_states(self, msg):
+        for name, pose in zip(msg.name, msg.pose):
+            self._model_z[name] = (pose.position.x, pose.position.y, pose.position.z)
+
+    def _log_cube(self, name: str, label: str):
+        """Log vi tri that cua cube trong Gazebo de debug (cube co len cung gripper khong)."""
+        p = self._model_z.get(name)
+        if p is not None:
+            self.node.get_logger().info(f"DEBUG {label}: {name} that o x={p[0]:.3f} y={p[1]:.3f} z={p[2]:.3f}")
+
     def _verify_grasp(self) -> bool:
-        """Co cube giua 2 ngon: ngon bi chan o q ~ 0.005. Khong co cube: ngon dong toi FINGER_CLOSE."""
+        """Co cube giua 2 ngon neu tong do mo q_trai + q_phai >= GRASP_MIN_SUM.
+
+        Khoang hep giua 2 mat ngon = 0.03 + q_trai + q_phai. Cube rong 4cm -> tong q ~ 0.010.
+        Khong co cube: ngon dong toi FINGER_CLOSE moi ben -> tong q ~ 2 * FINGER_CLOSE.
+        Dung TONG (khong xet tung ngon) vi cube co the lech ve mot phia.
+        """
         time.sleep(0.8)
         if len(self._finger_pos) < 2:
             return True  # khong co du lieu -> khong ket luan la hut
-        qs = list(self._finger_pos.values())
+        ql = self._finger_pos.get("left_finger_joint", 0.0)
+        qr = self._finger_pos.get("right_finger_joint", 0.0)
+        total = ql + qr
         self.node.get_logger().info(
-            f"Kiem tra gap: left={self._finger_pos.get('left_finger_joint', 0):.4f} "
-            f"right={self._finger_pos.get('right_finger_joint', 0):.4f} (co cube neu >= {GRASP_MIN_Q})")
-        return all(GRASP_MIN_Q <= q < 0.035 for q in qs)
+            f"Kiem tra gap: left={ql:.4f} right={qr:.4f} tong={total:.4f} (co cube neu >= {GRASP_MIN_SUM})")
+        return GRASP_MIN_SUM <= total < 0.07
 
     def _move_to_joint(self, joint_dict: dict) -> SkillStatus:
         if not self._move_client.wait_for_server(timeout_sec=20.0):
@@ -250,6 +275,7 @@ class RobotSkills:
         if st != SkillStatus.SUCCESS:
             return st
 
+        self._log_cube(object_name, "truoc khi kep")
         self.close_gripper()
         if not self._verify_grasp():
             self.node.get_logger().warn(f"Co the da gap hut {object_name}")
@@ -257,7 +283,10 @@ class RobotSkills:
             self._move_xyz(x, y, PICK_Z + LIFT_DZ)
             return SkillStatus.FAILED
 
-        return self._move_xyz(x, y, PICK_Z + LIFT_DZ)
+        st = self._move_xyz(x, y, PICK_Z + LIFT_DZ)
+        time.sleep(0.5)
+        self._log_cube(object_name, "sau khi nhac (z ~0.10 la cube dang len cung gripper, z ~0.02 la cube con tren ban)")
+        return st
 
     def place(self, object_name: str, zone_name: str) -> SkillStatus:
         pos = self.landmarks.get(zone_name)
