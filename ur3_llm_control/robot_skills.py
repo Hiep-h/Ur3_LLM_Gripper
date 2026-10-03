@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import time
+import rclpy
+import rclpy.time
 from enum import Enum
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -10,6 +12,7 @@ from shape_msgs.msg import SolidPrimitive
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 from sensor_msgs.msg import JointState
+import tf2_ros
 try:
     from gazebo_msgs.msg import ModelStates
 except ImportError:  # chi dung de debug, khong bat buoc
@@ -72,6 +75,9 @@ class RobotSkills:
         self.perception = perception
         self.landmarks = landmarks  # zone / diem do co dinh: {name: [x, y, z]}
 
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, node)
+
         self._finger_pos = {}
         node.create_subscription(JointState, "/joint_states", self._on_joint_state, 10)
 
@@ -131,6 +137,33 @@ class RobotSkills:
         p = self._model_z.get(name)
         if p is not None:
             self.node.get_logger().info(f"DEBUG {label}: {name} that o x={p[0]:.3f} y={p[1]:.3f} z={p[2]:.3f}")
+
+    def _log_links(self, label: str):
+        """CHI DE DEBUG: do cao (z) cac khop tay may va ngon gripper trong base_link."""
+        parts = []
+        for link in ("forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link",
+                     "tool0", "left_finger_link", "right_finger_link"):
+            try:
+                t = self.tf_buffer.lookup_transform(self.base_frame, link, rclpy.time.Time())
+                p = t.transform.translation
+                parts.append(f"{link}=({p.x:.2f},{p.y:.2f},{p.z:.2f})")
+            except Exception:
+                parts.append(f"{link}=?")
+        self.node.get_logger().info(f"DEBUG {label}: " + " ".join(parts))
+
+    def _cube_snapshot(self) -> dict:
+        return {n: p for n, p in self._model_z.items() if n.endswith("_cube")}
+
+    def _report_moved(self, before: dict, label: str):
+        """CHI DE DEBUG: bao cac cube (thuc te trong Gazebo) da bi xe dich > 1cm so voi truoc."""
+        moved = []
+        for n, p in self._cube_snapshot().items():
+            b = before.get(n)
+            if b is not None:
+                d = ((p[0] - b[0]) ** 2 + (p[1] - b[1]) ** 2 + (p[2] - b[2]) ** 2) ** 0.5
+                if d > 0.01:
+                    moved.append(f"{n} lech {d * 100:.1f}cm (z={p[2]:.3f})")
+        self.node.get_logger().info(f"DEBUG {label}: " + ("cube bi dich: " + "; ".join(moved) if moved else "khong cube nao bi dich"))
 
     def _verify_grasp(self) -> bool:
         """Co cube giua 2 ngon neu tong do mo q_trai + q_phai >= GRASP_MIN_SUM.
@@ -272,11 +305,20 @@ class RobotSkills:
         x, y = detected[object_name]
 
         self.open_gripper()
+        time.sleep(0.5)
+        self.node.get_logger().info(
+            f"DEBUG ngon sau khi mo: left={self._finger_pos.get('left_finger_joint', -1):.4f} "
+            f"right={self._finger_pos.get('right_finger_joint', -1):.4f}")
+        before = self._cube_snapshot()
 
         st = self._move_xyz(x, y, PICK_Z + PRE_GRASP_DZ)
+        self._log_links("tren cube (pre-grasp)")
+        self._report_moved(before, "sau pre-grasp")
         if st != SkillStatus.SUCCESS:
             return st
         st = self._move_xyz(x, y, PICK_Z)
+        self._log_links("o do cao kep (grasp)")
+        self._report_moved(before, "sau khi ha xuong grasp")
         if st != SkillStatus.SUCCESS:
             return st
 
