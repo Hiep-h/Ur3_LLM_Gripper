@@ -20,11 +20,11 @@
   <!-- THAN GRIPPER -->
   <link name="gripper_base_link">
     <visual>
-      <geometry><mesh filename="package://ur3_llm_control/meshes/robotiq_2f_85/ur_to_robotiq_adapter.dae"/></geometry>
+      <geometry><mesh filename="file://$(find ur3_llm_control)/meshes/robotiq_2f_85/ur_to_robotiq_adapter.dae"/></geometry>
     </visual>
     <visual>
       <origin xyz="0 0 0.011" rpy="0 0 1.5708"/>
-      <geometry><mesh filename="package://ur3_llm_control/meshes/robotiq_2f_85/robotiq_base.dae"/></geometry>
+      <geometry><mesh filename="file://$(find ur3_llm_control)/meshes/robotiq_2f_85/robotiq_base.dae"/></geometry>
     </visual>
     <collision>
       <origin xyz="0 0 ${(body_top + body_bottom) / 2}" rpy="0 0 0"/>
