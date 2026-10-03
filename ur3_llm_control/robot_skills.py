@@ -57,13 +57,11 @@ PLACE_Z = 0.175
 PRE_GRASP_DZ = 0.05
 # Ngon gripper: mat trong o +-(0.015 + q). Cube 4cm (nua be rong 0.02) cham ngon o q = 0.005.
 FINGER_OPEN = 0.04
-# Cube 4cm: 2 ngon cham cube o q = 0.005 moi ben. gazebo_ros2_control dat vi tri khop truc tiep
-# (khong gioi han luc) nen chi can ep ngap > ~1mm la cube bi ban vang (da quan sat o 0.0 va 0.0035).
-# Dat diem dong sat diem cham de ep chi vai phan mm.
-FINGER_CLOSE = 0.0045
-# Tong q nho hon nguong nay nghia la 2 ngon dong qua sau (khong co cube giua). Cua so nay hep nen
-# chi dung de CANH BAO, khong huy pick.
-GRASP_MIN_SUM = 0.0085
+# Ngon dieu khien bang LUC (effort PID, xem config/gripper_controllers.yaml). Lenh dong ve 0:
+# khi gap cube 4cm, ngon bi chan o q ~ 0.005 va luc ep = p * 0.005 (~15 N moi ben), on dinh.
+FINGER_CLOSE = 0.0
+# Co cube giua 2 ngon: tong q hai ngon ~ 0.010. Khong co cube: ngon dong het, tong ~ 0.
+GRASP_MIN_SUM = 0.006
 CUBE_LIFTED_Z = 0.06  # cube cao hon muc nay sau khi nhac thi coi la dang duoc giu (tam cube luc nam ban ~0.02)
 LIFT_DZ = 0.08
 
@@ -122,10 +120,9 @@ class RobotSkills:
         return self._send_gripper(FINGER_OPEN, duration_sec=2.0)
 
     def close_gripper(self) -> bool:
-        # Dong cham toi FINGER_CLOSE (chi ep nhe vao cube), KHONG dong ve 0:
-        # gazebo_ros2_control dat vi tri khop truc tiep nen dong ve 0 se ep ngon ngam sau
-        # vao cube va ban cube ra ngoai.
-        return self._send_gripper(FINGER_CLOSE, duration_sec=3.0)
+        # Dong cham ve FINGER_CLOSE (=0) bang dieu khien LUC: gap cube thi ngon bi chan va chi ep
+        # voi luc gioi han (p * sai so), khong ban cube ra nhu dieu khien vi tri truc tiep.
+        return self._send_gripper(FINGER_CLOSE, duration_sec=4.0)
 
     def _on_joint_state(self, msg: JointState):
         for name, pos in zip(msg.name, msg.position):
@@ -174,7 +171,7 @@ class RobotSkills:
         """Co cube giua 2 ngon neu tong do mo q_trai + q_phai >= GRASP_MIN_SUM.
 
         Khoang hep giua 2 mat ngon = 0.03 + q_trai + q_phai. Cube rong 4cm -> tong q ~ 0.010.
-        Khong co cube: ngon dong toi FINGER_CLOSE moi ben -> tong q ~ 2 * FINGER_CLOSE.
+        Khong co cube: ngon dong het (q ~ 0) -> tong q ~ 0.
         Dung TONG (khong xet tung ngon) vi cube co the lech ve mot phia.
         """
         time.sleep(0.8)
@@ -364,7 +361,10 @@ class RobotSkills:
         self._log_cube(object_name, "truoc khi kep")
         self.close_gripper()
         if not self._verify_grasp():
-            self.node.get_logger().warn(f"Canh bao: co the da gap hut {object_name} (tiep tuc nhac len)")
+            self.node.get_logger().warn(f"Gap hut {object_name}: khong co cube giua 2 ngon")
+            self.open_gripper()
+            self._move_xyz(x, y, PICK_Z + LIFT_DZ)
+            return SkillStatus.FAILED
 
         st = self._move_xyz(x, y, PICK_Z + LIFT_DZ)
         time.sleep(0.5)

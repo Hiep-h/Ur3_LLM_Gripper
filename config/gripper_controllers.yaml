@@ -34,10 +34,28 @@ gripper_controller:
     joints:
       - left_finger_joint
       - right_finger_joint
+    # Dieu khien bang LUC (effort): luc ep len cube = p * sai_so_vi_tri, nen co gioi han va on dinh.
+    # (Dieu khien bang vi tri cua gazebo_ros2_control dat khop truc tiep, khong kep chat duoc cube.)
     command_interfaces:
-      - position
+      - effort
     state_interfaces:
       - position
       - velocity
+    gains:
+      left_finger_joint:
+        p: 3000.0
+        i: 0.0
+        d: 40.0
+      right_finger_joint:
+        p: 3000.0
+        i: 0.0
+        d: 40.0
     constraints:
-      goal_time: 2.0
+      goal_time: 3.0
+      stopped_velocity_tolerance: 0.5
+      left_finger_joint:
+        trajectory: 0.0
+        goal: 0.02
+      right_finger_joint:
+        trajectory: 0.0
+        goal: 0.02
