@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 100
+    update_rate: 1000
 
     joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
@@ -43,13 +43,13 @@ gripper_controller:
       - velocity
     gains:
       left_finger_joint:
-        p: 3000.0
+        p: 400.0
         i: 0.0
-        d: 40.0
+        d: 10.0
       right_finger_joint:
-        p: 3000.0
+        p: 400.0
         i: 0.0
-        d: 40.0
+        d: 10.0
     constraints:
       goal_time: 3.0
       stopped_velocity_tolerance: 0.5

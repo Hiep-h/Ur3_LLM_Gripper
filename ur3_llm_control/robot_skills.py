@@ -60,7 +60,7 @@ PRE_GRASP_DZ = 0.05
 # Ngon gripper: mat trong o +-(0.015 + q). Cube 4cm (nua be rong 0.02) cham ngon o q = 0.005.
 FINGER_OPEN = 0.04
 # Ngon dieu khien bang LUC (effort PID, xem config/gripper_controllers.yaml). Lenh dong ve 0:
-# khi gap cube 4cm, ngon bi chan o q ~ 0.005 va luc ep = p * 0.005 (~15 N moi ben), on dinh.
+# khi gap cube 4cm, ngon bi chan o q ~ 0.005 va luc ep = p * 0.005 (~2 N moi ben, p = 400); p thap + controller 1000 Hz de khong dao dong.
 FINGER_CLOSE = 0.0
 # Co cube giua 2 ngon: tong q hai ngon ~ 0.010. Khong co cube: ngon dong het, tong ~ 0.
 GRASP_MIN_SUM = 0.006
