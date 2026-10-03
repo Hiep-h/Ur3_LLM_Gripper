@@ -29,6 +29,18 @@ HOME_JOINTS = {
 
 GRASP_ORIENTATION = (0.7071, -0.7071, 0.0, 0.0)
 
+MOVEIT_ERRORS = {
+    -1: "PLANNING_FAILED", -2: "INVALID_MOTION_PLAN", -3: "MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE",
+    -4: "CONTROL_FAILED", -5: "UNABLE_TO_AQUIRE_SENSOR_DATA", -6: "TIMED_OUT", -7: "PREEMPTED",
+    -10: "START_STATE_IN_COLLISION", -11: "START_STATE_VIOLATES_PATH_CONSTRAINTS",
+    -12: "GOAL_IN_COLLISION", -13: "GOAL_VIOLATES_PATH_CONSTRAINTS", -14: "GOAL_CONSTRAINTS_VIOLATED",
+    -15: "INVALID_GROUP_NAME", -16: "INVALID_GOAL_CONSTRAINTS", -17: "INVALID_ROBOT_STATE",
+    -18: "INVALID_LINK_NAME", -19: "INVALID_OBJECT_NAME", -21: "FRAME_TRANSFORM_FAILURE",
+    -22: "COLLISION_CHECKING_UNAVAILABLE", -23: "ROBOT_STATE_STALE", -24: "SENSOR_INFO_STALE",
+    -31: "NO_IK_SOLUTION",
+}
+
+
 # Cao do tool0 (base_link) khi gripper om vua cube 4cm / tha cube xuong ban.
 # Ngon gripper nam 0.104..0.164 duoi tool0 (xem urdf/simple_gripper.xacro):
 # PICK_Z = 0.17 -> ngon cao ~0.006..0.066, than gripper cach dinh cube (0.04) ~2.6cm.
@@ -121,10 +133,17 @@ class RobotSkills:
 
         handle = self._spin_wait(self._move_client.send_goal_async(goal))
         if not handle or not handle.accepted:
+            self.node.get_logger().error("MoveIt tu choi goal: joint goal (home)")
             return SkillStatus.PLANNING_FAILED
 
         res = self._spin_wait(handle.get_result_async(), timeout_sec=30.0)
-        if not res or res.result.error_code.val != 1:
+        if not res:
+            self.node.get_logger().error("MoveIt khong tra ket qua (timeout): joint goal (home)")
+            return SkillStatus.PLANNING_FAILED
+        code = res.result.error_code.val
+        if code != 1:
+            self.node.get_logger().error(
+                f"MoveIt that bai: joint goal (home) -> {MOVEIT_ERRORS.get(code, code)} ({code})")
             return SkillStatus.PLANNING_FAILED
         return SkillStatus.SUCCESS
 
@@ -174,10 +193,17 @@ class RobotSkills:
 
         handle = self._spin_wait(self._move_client.send_goal_async(goal))
         if not handle or not handle.accepted:
+            self.node.get_logger().error(f"MoveIt tu choi goal: pose goal x={x:.3f} y={y:.3f} z={z:.3f}")
             return SkillStatus.PLANNING_FAILED
 
         res = self._spin_wait(handle.get_result_async(), timeout_sec=30.0)
-        if not res or res.result.error_code.val != 1:
+        if not res:
+            self.node.get_logger().error(f"MoveIt khong tra ket qua (timeout): pose goal x={x:.3f} y={y:.3f} z={z:.3f}")
+            return SkillStatus.PLANNING_FAILED
+        code = res.result.error_code.val
+        if code != 1:
+            self.node.get_logger().error(
+                f"MoveIt that bai: pose goal x={x:.3f} y={y:.3f} z={z:.3f} -> {MOVEIT_ERRORS.get(code, code)} ({code})")
             return SkillStatus.PLANNING_FAILED
         return SkillStatus.SUCCESS
 
