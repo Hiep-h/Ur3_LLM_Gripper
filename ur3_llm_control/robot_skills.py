@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import time
 import rclpy
 import rclpy.time
@@ -328,6 +329,8 @@ class RobotSkills:
             return
         scene = PlanningScene()
         scene.is_diff = True
+        if os.environ.get("UR3_NO_OBSTACLES"):
+            detected = {}  # A/B test: bo vat can, chi xoa obstacle cu
         for oid in self._obstacle_ids:
             co = CollisionObject()
             co.id = oid
