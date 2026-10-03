@@ -7,6 +7,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.action import MoveGroup
+from moveit_msgs.srv import GetPositionIK
 from moveit_msgs.msg import Constraints, PositionConstraint, OrientationConstraint, JointConstraint
 from shape_msgs.msg import SolidPrimitive
 from control_msgs.action import FollowJointTrajectory
@@ -59,10 +60,11 @@ FINGER_OPEN = 0.04
 # Cube 4cm: 2 ngon cham cube o q = 0.005 moi ben. gazebo_ros2_control dat vi tri khop truc tiep
 # (khong gioi han luc) nen chi can ep ngap > ~1mm la cube bi ban vang (da quan sat o 0.0 va 0.0035).
 # Dat diem dong sat diem cham de ep chi vai phan mm.
-FINGER_CLOSE = 0.0047
+FINGER_CLOSE = 0.0045
 # Tong q nho hon nguong nay nghia la 2 ngon dong qua sau (khong co cube giua). Cua so nay hep nen
 # chi dung de CANH BAO, khong huy pick.
 GRASP_MIN_SUM = 0.0085
+CUBE_LIFTED_Z = 0.06  # cube cao hon muc nay sau khi nhac thi coi la dang duoc giu (tam cube luc nam ban ~0.02)
 LIFT_DZ = 0.08
 
 class RobotSkills:
@@ -79,6 +81,8 @@ class RobotSkills:
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, node)
 
         self._finger_pos = {}
+        self._joint_pos = {}
+        self._ik_client = node.create_client(GetPositionIK, "/compute_ik")
         node.create_subscription(JointState, "/joint_states", self._on_joint_state, 10)
 
         # CHI DE DEBUG: do cao that cua cube trong Gazebo (khong dung de lap ke hoach/quyet dinh).
@@ -125,6 +129,7 @@ class RobotSkills:
 
     def _on_joint_state(self, msg: JointState):
         for name, pos in zip(msg.name, msg.position):
+            self._joint_pos[name] = pos
             if name in ("left_finger_joint", "right_finger_joint"):
                 self._finger_pos[name] = pos
 
@@ -182,7 +187,7 @@ class RobotSkills:
             f"Kiem tra gap: left={ql:.4f} right={qr:.4f} tong={total:.4f} (co cube neu >= {GRASP_MIN_SUM})")
         return GRASP_MIN_SUM <= total < 0.07
 
-    def _move_to_joint(self, joint_dict: dict) -> SkillStatus:
+    def _move_to_joint(self, joint_dict: dict, label: str = "joint goal (home)") -> SkillStatus:
         if not self._move_client.wait_for_server(timeout_sec=20.0):
             return SkillStatus.FAILED
 
@@ -207,17 +212,17 @@ class RobotSkills:
 
         handle = self._spin_wait(self._move_client.send_goal_async(goal))
         if not handle or not handle.accepted:
-            self.node.get_logger().error("MoveIt tu choi goal: joint goal (home)")
+            self.node.get_logger().error(f"MoveIt tu choi goal: {label}")
             return SkillStatus.PLANNING_FAILED
 
         res = self._spin_wait(handle.get_result_async(), timeout_sec=30.0)
         if not res:
-            self.node.get_logger().error("MoveIt khong tra ket qua (timeout): joint goal (home)")
+            self.node.get_logger().error(f"MoveIt khong tra ket qua (timeout): {label}")
             return SkillStatus.PLANNING_FAILED
         code = res.result.error_code.val
         if code != 1:
             self.node.get_logger().error(
-                f"MoveIt that bai: joint goal (home) -> {MOVEIT_ERRORS.get(code, code)} ({code})")
+                f"MoveIt that bai: {label} -> {MOVEIT_ERRORS.get(code, code)} ({code})")
             return SkillStatus.PLANNING_FAILED
         return SkillStatus.SUCCESS
 
@@ -284,7 +289,41 @@ class RobotSkills:
     def home(self) -> SkillStatus:
         return self._move_to_joint(HOME_JOINTS)
 
+    def _ik_joints(self, x, y, z):
+        """Giai IK (MoveIt /compute_ik) khoi dau tu tu the khop HIEN TAI, de luon chon cach gap tay
+        gan tu the hien tai (tranh MoveIt chon ngau nhien cach gap khac, vi du cang tay ha thap quet cube)."""
+        if not self._ik_client.wait_for_service(timeout_sec=5.0):
+            return None
+        req = GetPositionIK.Request()
+        req.ik_request.group_name = self.group_name
+        req.ik_request.ik_link_name = self.ee_link
+        req.ik_request.avoid_collisions = True
+        req.ik_request.timeout.sec = 1
+        for jn in HOME_JOINTS:
+            if jn in self._joint_pos:
+                req.ik_request.robot_state.joint_state.name.append(jn)
+                req.ik_request.robot_state.joint_state.position.append(float(self._joint_pos[jn]))
+        pose = PoseStamped()
+        pose.header.frame_id = self.base_frame
+        pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = float(x), float(y), float(z)
+        (pose.pose.orientation.x, pose.pose.orientation.y,
+         pose.pose.orientation.z, pose.pose.orientation.w) = GRASP_ORIENTATION
+        req.ik_request.pose_stamped = pose
+        res = self._spin_wait(self._ik_client.call_async(req), timeout_sec=5.0)
+        if res is None or res.error_code.val != 1:
+            code = None if res is None else res.error_code.val
+            self.node.get_logger().warn(f"IK that bai cho ({x:.3f},{y:.3f},{z:.3f}): {MOVEIT_ERRORS.get(code, code)}")
+            return None
+        sol = dict(zip(res.solution.joint_state.name, res.solution.joint_state.position))
+        return {jn: sol[jn] for jn in HOME_JOINTS if jn in sol}
+
     def _move_xyz(self, x, y, z) -> SkillStatus:
+        joints = self._ik_joints(x, y, z)
+        if joints:
+            st = self._move_to_joint(joints, label=f"IK goal x={x:.3f} y={y:.3f} z={z:.3f}")
+            if st == SkillStatus.SUCCESS:
+                return st
+        # du phong: dat muc tieu theo pose
         return self._move_to_pose(x, y, z, *GRASP_ORIENTATION)
 
     def pick(self, object_name: str) -> SkillStatus:
@@ -330,6 +369,13 @@ class RobotSkills:
         st = self._move_xyz(x, y, PICK_Z + LIFT_DZ)
         time.sleep(0.5)
         self._log_cube(object_name, "sau khi nhac (z ~0.10 la cube dang len cung gripper, z ~0.02 la cube con tren ban)")
+        if st == SkillStatus.SUCCESS:
+            p = self._model_z.get(object_name)
+            # Kiem tra bang trang thai mo phong (chi co trong Gazebo): cube phai len khoi mat ban.
+            if p is not None and p[2] < CUBE_LIFTED_Z:
+                self.node.get_logger().error(
+                    f"Gap THAT BAI: {object_name} van nam tren ban (z={p[2]:.3f}), khong len cung gripper")
+                return SkillStatus.FAILED
         return st
 
     def place(self, object_name: str, zone_name: str) -> SkillStatus:
