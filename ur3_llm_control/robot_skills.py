@@ -7,8 +7,9 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.action import MoveGroup
-from moveit_msgs.srv import GetPositionIK
-from moveit_msgs.msg import Constraints, PositionConstraint, OrientationConstraint, JointConstraint
+from moveit_msgs.srv import GetPositionIK, ApplyPlanningScene
+from moveit_msgs.msg import (Constraints, PositionConstraint, OrientationConstraint, JointConstraint,
+                             CollisionObject, PlanningScene)
 from shape_msgs.msg import SolidPrimitive
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
@@ -66,6 +67,7 @@ FINGER_CLOSE = 0.0
 GRASP_MIN_SUM = 0.006
 CUBE_LIFTED_Z = 0.06  # cube cao hon muc nay sau khi nhac thi coi la dang duoc giu (tam cube luc nam ban ~0.02)
 LIFT_DZ = 0.08
+CUBE_OBSTACLE_SIZE = 0.08  # hop vat can quanh moi cube khac (cube 4cm + do hu)
 
 class RobotSkills:
     def __init__(self, node: Node, perception, landmarks: dict,
@@ -83,6 +85,8 @@ class RobotSkills:
         self._finger_pos = {}
         self._joint_pos = {}
         self._ik_client = node.create_client(GetPositionIK, "/compute_ik")
+        self._scene_client = node.create_client(ApplyPlanningScene, "/apply_planning_scene")
+        self._obstacle_ids = []
         node.create_subscription(JointState, "/joint_states", self._on_joint_state, 10)
 
         # CHI DE DEBUG: do cao that cua cube trong Gazebo (khong dung de lap ke hoach/quyet dinh).
@@ -316,6 +320,45 @@ class RobotSkills:
         sol = dict(zip(res.solution.joint_state.name, res.solution.joint_state.position))
         return {jn: sol[jn] for jn in HOME_JOINTS if jn in sol}
 
+    def _set_obstacles(self, detected: dict, exclude: str | None):
+        """Dat cac cube KHAC (vi tri tu camera) lam vat can trong MoveIt planning scene de duong di
+        tranh chung. Cube dang gap (exclude) khong dua vao de gripper tiep can duoc."""
+        if not self._scene_client.wait_for_service(timeout_sec=5.0):
+            self.node.get_logger().warn("apply_planning_scene khong san sang, bo qua vat can")
+            return
+        scene = PlanningScene()
+        scene.is_diff = True
+        for oid in self._obstacle_ids:
+            co = CollisionObject()
+            co.id = oid
+            co.header.frame_id = self.base_frame
+            co.operation = CollisionObject.REMOVE
+            scene.world.collision_objects.append(co)
+        self._obstacle_ids = []
+        for name, (cx, cy) in detected.items():
+            if name == exclude:
+                continue
+            co = CollisionObject()
+            co.id = f"obs_{name}"
+            co.header.frame_id = self.base_frame
+            co.operation = CollisionObject.ADD
+            prim = SolidPrimitive()
+            prim.type = SolidPrimitive.BOX
+            prim.dimensions = [CUBE_OBSTACLE_SIZE, CUBE_OBSTACLE_SIZE, 0.07]
+            pose = PoseStamped().pose
+            pose.position.x, pose.position.y, pose.position.z = float(cx), float(cy), 0.035
+            pose.orientation.w = 1.0
+            co.primitives = [prim]
+            co.primitive_poses = [pose]
+            scene.world.collision_objects.append(co)
+            self._obstacle_ids.append(co.id)
+        req = ApplyPlanningScene.Request()
+        req.scene = scene
+        res = self._spin_wait(self._scene_client.call_async(req), timeout_sec=5.0)
+        ok = bool(res and res.success)
+        self.node.get_logger().info(
+            f"DEBUG vat can MoveIt: {len(self._obstacle_ids)} cube khac ({'OK' if ok else 'THAT BAI'})")
+
     def _tool_xyz(self):
         try:
             t = self.tf_buffer.lookup_transform(self.base_frame, self.ee_link, rclpy.time.Time())
@@ -324,7 +367,7 @@ class RobotSkills:
         except Exception:
             return None
 
-    def _move_xyz(self, x, y, z, precise: bool = False) -> SkillStatus:
+    def _move_xyz(self, x, y, z, precise: bool = False, recover: bool = True) -> SkillStatus:
         """Di chuyen tool0 toi (x, y, z). precise=True: do lai vi tri that va bu them neu lech > 4mm
         (dung khi kep/tha vi lech 1cm la du de chi 1 ngon cham cube)."""
         tx, ty, tz = x, y, z
@@ -339,7 +382,7 @@ class RobotSkills:
             if st != SkillStatus.SUCCESS:
                 # du phong: dat muc tieu theo pose
                 st = self._move_to_pose(tx, ty, tz, *GRASP_ORIENTATION)
-            if st != SkillStatus.SUCCESS and not recovered:
+            if st != SkillStatus.SUCCESS and recover and not recovered:
                 # Chuyen dong hong giua chung (vi du CONTROL_FAILED): ve home roi thu lai mot lan
                 self.node.get_logger().warn("Chuyen dong that bai, ve home roi thu lai mot lan")
                 recovered = True
@@ -380,6 +423,7 @@ class RobotSkills:
             self.node.get_logger().error(f"Camera khong nhin thay {object_name}")
             return SkillStatus.INVALID_OBJECT
         x, y = detected[object_name]
+        self._set_obstacles(detected, exclude=object_name)
 
         self.open_gripper()
         time.sleep(0.5)
@@ -393,7 +437,7 @@ class RobotSkills:
         self._report_moved(before, "sau pre-grasp")
         if st != SkillStatus.SUCCESS:
             return st
-        st = self._move_xyz(x, y, PICK_Z, precise=True)
+        st = self._move_xyz(x, y, PICK_Z, precise=True, recover=False)
         self._log_links("o do cao kep (grasp)")
         self._report_moved(before, "sau khi ha xuong grasp")
         if st != SkillStatus.SUCCESS:
@@ -407,7 +451,7 @@ class RobotSkills:
             self._move_xyz(x, y, PICK_Z + LIFT_DZ)
             return SkillStatus.FAILED
 
-        st = self._move_xyz(x, y, PICK_Z + LIFT_DZ)
+        st = self._move_xyz(x, y, PICK_Z + LIFT_DZ, recover=False)
         time.sleep(0.5)
         self._log_cube(object_name, "sau khi nhac (z ~0.10 la cube dang len cung gripper, z ~0.02 la cube con tren ban)")
         if st == SkillStatus.SUCCESS:
@@ -425,14 +469,14 @@ class RobotSkills:
             return SkillStatus.INVALID_ZONE
         x, y = pos[0], pos[1]
 
-        st = self._move_xyz(x, y, PLACE_Z + PRE_GRASP_DZ)
+        st = self._move_xyz(x, y, PLACE_Z + PRE_GRASP_DZ, recover=False)
         if st != SkillStatus.SUCCESS:
             return st
-        st = self._move_xyz(x, y, PLACE_Z, precise=True)
+        st = self._move_xyz(x, y, PLACE_Z, precise=True, recover=False)
         if st != SkillStatus.SUCCESS:
             return st
 
         self.open_gripper()
         time.sleep(0.5)
 
-        return self._move_xyz(x, y, PLACE_Z + LIFT_DZ)
+        return self._move_xyz(x, y, PLACE_Z + LIFT_DZ, recover=False)
