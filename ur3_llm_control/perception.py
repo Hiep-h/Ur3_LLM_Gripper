@@ -22,7 +22,7 @@ class PerceptionInterface:
         self._latest = json.loads(msg.data)
         self._received_at = time.time()
 
-    def detect_objects(self, timeout_sec: float = 5.0, fresh: bool = True) -> dict:
+    def detect_objects(self, timeout_sec: float = 20.0, fresh: bool = True) -> dict:
         """Tra ve {object_name: (x, y)} trong base_link.
 
         fresh=True: doi mot khung hinh MOI (sau thoi diem goi), de tranh doc
