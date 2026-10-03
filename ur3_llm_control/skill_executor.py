@@ -129,6 +129,11 @@ def main():
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
 
+    # Luc khoi dong mot ngon co the bi truot lech (khop truot, gia toc luc dat tu the ban dau).
+    # Mo gripper ngay de hai ngon tro lai doi xung truoc khi nhan lenh.
+    if not node.skills.open_gripper():
+        print("WARN: khong mo duoc gripper luc khoi dong (gripper_controller chua san sang?)")
+
     try:
         while rclpy.ok():
             cmd = input("\nNhap lenh (hoac 'exit'): ").strip()
