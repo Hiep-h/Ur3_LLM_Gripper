@@ -1,22 +1,43 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:property name="finger_length" value="0.06"/>
-  <xacro:property name="finger_width"  value="0.02"/>
-  <xacro:property name="finger_height" value="0.015"/>
-  <xacro:property name="base_size"     value="0.05"/>
+  <!-- Gripper song song 2 ngon truot (khong dung <mimic>, chay duoc tren Gazebo Classic).
+       Hinh dang gripper - adapter + than Robotiq 2F-85 (mesh MIT, xem thu muc meshes/robotiq_2f_85)
+       Chi dung mesh cho VISUAL, collision la hop don gian de MoveIt/ODE on dinh.
+       LUU Y - khong de chuoi hai cham + dau cach trong comment cua file xacro, vi rcl doc
+       robot_description nhu YAML nen se bi loi parser va controller_manager khong khoi dong.
+       Mesh Robotiq mo theo truc x -> xoay 90 do quanh z de ngon mo theo truc y cua tool0. -->
+
+  <xacro:property name="finger_len"    value="0.06"/>   <!-- doc truc z (dai) -->
+  <xacro:property name="finger_wid"    value="0.02"/>   <!-- doc truc x -->
+  <xacro:property name="finger_thk"    value="0.016"/>  <!-- doc truc y (huong mo) -->
+  <xacro:property name="finger_y0"     value="0.023"/>  <!-- tam ngon khi dong (q=0), mat trong o +-0.015 -->
+  <xacro:property name="finger_z"      value="0.134"/>  <!-- tam ngon duoi tool0; ngon nam duoi than 0.104..0.164 -->
+  <xacro:property name="body_top"      value="0.0139"/> <!-- adapter cao 0.0139 -->
+  <xacro:property name="body_bottom"   value="0.100"/>
   <xacro:property name="max_open"      value="0.04"/>
 
-  <!-- BASE GRIPPER -->
+  <!-- THAN GRIPPER -->
   <link name="gripper_base_link">
     <visual>
-      <geometry><box size="${base_size} ${base_size} 0.03"/></geometry>
-      <material name="grey"><color rgba="0.3 0.3 0.3 1"/></material>
+      <geometry><mesh filename="file://$(find ur3_llm_control)/meshes/robotiq_2f_85/ur_to_robotiq_adapter.dae"/></geometry>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0.011" rpy="0 0 1.5708"/>
+      <geometry><mesh filename="file://$(find ur3_llm_control)/meshes/robotiq_2f_85/robotiq_base.dae"/></geometry>
+    </visual>
+    <!-- Thanh ray noi than voi 2 ngon (chi de nhin, khong co collision) -->
+    <visual>
+      <origin xyz="0 0 ${body_bottom + 0.004}" rpy="0 0 0"/>
+      <geometry><box size="0.03 0.15 0.012"/></geometry>
+      <material name="rail_grey"><color rgba="0.22 0.22 0.24 1"/></material>
     </visual>
     <collision>
-      <geometry><box size="${base_size} ${base_size} 0.03"/></geometry>
+      <origin xyz="0 0 ${(body_top + body_bottom) / 2}" rpy="0 0 0"/>
+      <geometry><box size="0.075 0.085 ${body_bottom - body_top}"/></geometry>
     </collision>
     <inertial>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
       <mass value="0.3"/>
       <inertia ixx="0.0003" iyy="0.0003" izz="0.0003" ixy="0" ixz="0" iyz="0"/>
     </inertial>
@@ -25,17 +46,17 @@
   <joint name="gripper_base_joint" type="fixed">
     <parent link="tool0"/>
     <child  link="gripper_base_link"/>
-    <origin xyz="0 0 0.015" rpy="0 0 0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
-  <!-- LEFT FINGER -->
+  <!-- NGON TRAI -->
   <link name="left_finger_link">
     <visual>
-      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
-      <material name="dark_grey"><color rgba="0.15 0.15 0.15 1"/></material>
+      <geometry><box size="${finger_wid} ${finger_thk} ${finger_len}"/></geometry>
+      <material name="finger_dark"><color rgba="0.12 0.12 0.13 1"/></material>
     </visual>
     <collision>
-      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
+      <geometry><box size="${finger_wid} ${finger_thk} ${finger_len}"/></geometry>
     </collision>
     <inertial>
       <mass value="0.05"/>
@@ -46,20 +67,20 @@
   <joint name="left_finger_joint" type="prismatic">
     <parent link="gripper_base_link"/>
     <child  link="left_finger_link"/>
-    <origin xyz="0 0.025 0.04" rpy="0 0 0"/>
+    <origin xyz="0 ${finger_y0} ${finger_z}" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="0.0" upper="${max_open}" effort="50" velocity="0.05"/>
     <dynamics damping="1.0" friction="0.5"/>
   </joint>
 
-  <!-- RIGHT FINGER -->
+  <!-- NGON PHAI -->
   <link name="right_finger_link">
     <visual>
-      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
-      <material name="dark_grey"/>
+      <geometry><box size="${finger_wid} ${finger_thk} ${finger_len}"/></geometry>
+      <material name="finger_dark"/>
     </visual>
     <collision>
-      <geometry><box size="${finger_length} ${finger_width} ${finger_height}"/></geometry>
+      <geometry><box size="${finger_wid} ${finger_thk} ${finger_len}"/></geometry>
     </collision>
     <inertial>
       <mass value="0.05"/>
@@ -70,19 +91,23 @@
   <joint name="right_finger_joint" type="prismatic">
     <parent link="gripper_base_link"/>
     <child  link="right_finger_link"/>
-    <origin xyz="0 -0.025 0.04" rpy="0 0 0"/>
+    <origin xyz="0 ${-finger_y0} ${finger_z}" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
     <limit lower="0.0" upper="${max_open}" effort="50" velocity="0.05"/>
     <dynamics damping="1.0" friction="0.5"/>
   </joint>
 
-  <!-- GAZEBO CONTACT FRICTION -->
+  <!-- MA SAT / TIEP XUC (tham khao thong so cua darshmenon/UR3_ROS2_PICK_AND_PLACE, MIT) -->
   <gazebo reference="left_finger_link">
     <mu1>50.0</mu1><mu2>50.0</mu2>
+    <kp>100000.0</kp><kd>10.0</kd>
+    <minDepth>0.0001</minDepth><maxVel>0.01</maxVel>
     <material>Gazebo/DarkGrey</material>
   </gazebo>
   <gazebo reference="right_finger_link">
     <mu1>50.0</mu1><mu2>50.0</mu2>
+    <kp>100000.0</kp><kd>10.0</kd>
+    <minDepth>0.0001</minDepth><maxVel>0.01</maxVel>
     <material>Gazebo/DarkGrey</material>
   </gazebo>
 

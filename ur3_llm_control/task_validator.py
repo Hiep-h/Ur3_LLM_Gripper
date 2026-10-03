@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 ALLOWED_SKILLS = {"pick", "place", "home"}
-ALLOWED_OBJECTS = {"red_cube", "yellow_cube", "blue_cube"}
-ALLOWED_ZONES = {"zone_a", "zone_b", "zone_c", "temp_zone"}
+ALLOWED_OBJECTS = {"red_cube", "yellow_cube", "blue_cube", "green_cube", "purple_cube"}
+ALLOWED_ZONES = {"zone_a", "zone_b", "zone_c"}
 
 REQUIRED_FIELDS = {
     "pick": {"object"},
@@ -46,7 +46,7 @@ def validate_plan(plan: dict) -> tuple[bool, str]:
                 return False, (
                     f"ZONE_CONFLICT at step {i}: zone '{zone}' dang chua '{occupant}', "
                     f"khong the dat '{obj}' vao truoc khi doi '{occupant}' di noi khac "
-                    f"(can chen buoc trung gian qua temp_zone)"
+                    f"(can chen buoc trung gian qua diem do)"
                 )
             zone_holder[zone] = obj
 

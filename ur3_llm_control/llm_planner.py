@@ -7,13 +7,15 @@ pick(object)
 place(object, zone)
 home()
 
-Objects: red_cube, yellow_cube, blue_cube
+Objects: red_cube, yellow_cube, blue_cube, green_cube, purple_cube
 Zones: zone_a, zone_b, zone_c
 
 Vietnamese vocabulary mapping (user may write in Vietnamese or English, in many phrasings):
   "khoi do" / "mau do" / "red" -> red_cube
   "khoi vang" / "mau vang" / "yellow" -> yellow_cube
   "khoi xanh" / "mau xanh duong" / "blue" -> blue_cube
+  "khoi xanh la" / "mau xanh la" / "green" -> green_cube
+  "khoi tim" / "mau tim" / "purple" -> purple_cube
   "vung A" / "zone A" / "khu A" / "ô A" -> zone_a
   "vung B" / "zone B" / "khu B" / "ô B" -> zone_b
   "vung C" / "zone C" / "khu C" / "ô C" -> zone_c

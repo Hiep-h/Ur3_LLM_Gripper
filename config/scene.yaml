@@ -1,13 +1,28 @@
-objects:
-  red_cube:    {x: 0.28, y:  0.15, z: 0.02}
-  yellow_cube: {x: 0.28, y:  0.00, z: 0.02}
-  blue_cube:   {x: 0.28, y: -0.15, z: 0.02}
-
-zones:
-  zone_a:    {x: 0.40, y:  0.15, z: 0.005}
-  zone_b:    {x: 0.40, y:  0.00, z: 0.005}
-  zone_c:    {x: 0.40, y: -0.15, z: 0.005}
-  temp_zone: {x: 0.34, y:  0.30, z: 0.005}
-
 frame_id: "base_link"
 approach_offset_z: 0.15
+
+table:
+  center: [0.35, 0.0, -0.025]
+  size: [1.0, 0.8, 0.05]
+
+zones:
+  zone_a: [0.40,  0.15, 0.005]
+  zone_b: [0.40,  0.00, 0.005]
+  zone_c: [0.40, -0.15, 0.005]
+
+# Diem do tam an toan (ngoai cac zone) de don vat can
+park_positions:
+  park_1: [0.30,  0.30, 0.005]
+  park_2: [0.38,  0.30, 0.005]
+  park_3: [0.30, -0.30, 0.005]
+
+# Vi tri BAN DAU cua cac cube (chi dung de spawn trong Gazebo).
+# Robot KHONG doc muc nay: toa do cube lay tu camera (perception.detect_objects).
+# Kich ban demo Bai 03: zone_a=red, zone_b=blue, zone_c=green; yellow/purple ngoai zone.
+# "Put the red cube in Zone B" -> zone_b dang bi blue_cube chiem -> don sang park_1 truoc.
+objects:
+  red_cube:    [0.40,  0.15, 0.025]
+  blue_cube:   [0.40,  0.00, 0.025]
+  green_cube:  [0.40, -0.15, 0.025]
+  yellow_cube: [0.26,  0.20, 0.025]
+  purple_cube: [0.26, -0.20, 0.025]

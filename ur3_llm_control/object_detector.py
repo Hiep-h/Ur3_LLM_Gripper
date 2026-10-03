@@ -13,9 +13,11 @@ from tf2_ros import TransformException
 CUBE_TOP_Z = 0.04
 
 COLOR_RANGES = {
-    "red_cube":    [((0, 120, 80), (8, 255, 255)), ((170, 120, 80), (179, 255, 255))],
-    "yellow_cube": [((22, 120, 80), (35, 255, 255))],
-    "blue_cube":   [((100, 120, 60), (130, 255, 255))],
+    "red_cube":    [((0, 120, 70), (10, 255, 255)), ((170, 120, 70), (179, 255, 255))],
+    "yellow_cube": [((20, 120, 70), (35, 255, 255))],
+    "green_cube":  [((45, 100, 70), (75, 255, 255))],
+    "blue_cube":   [((100, 120, 70), (130, 255, 255))],
+    "purple_cube": [((135, 100, 60), (165, 255, 255))],
 }
 
 MIN_CONTOUR_AREA = 60
@@ -29,8 +31,12 @@ class ObjectDetector(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        self.create_subscription(CameraInfo, "/overhead_cam/camera_info", self._on_camera_info, 1)
-        self.create_subscription(Image, "/overhead_cam/image_raw", self._on_image, 5)
+        self.declare_parameter("camera_info_topic", "/overhead_cam/camera_info")
+        self.declare_parameter("image_topic", "/overhead_cam/image_raw")
+        info_topic = self.get_parameter("camera_info_topic").value
+        image_topic = self.get_parameter("image_topic").value
+        self.create_subscription(CameraInfo, info_topic, self._on_camera_info, 1)
+        self.create_subscription(Image, image_topic, self._on_image, 5)
         self.pub = self.create_publisher(String, "/detected_objects", 5)
 
         self.get_logger().info("object_detector: cho camera_info va anh...")
