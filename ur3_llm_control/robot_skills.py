@@ -53,8 +53,13 @@ PLACE_Z = 0.175
 PRE_GRASP_DZ = 0.05
 # Ngon gripper: mat trong o +-(0.015 + q). Cube 4cm (nua be rong 0.02) cham ngon o q = 0.005.
 FINGER_OPEN = 0.04
-FINGER_CLOSE = 0.0035  # ep nhe ~1.5mm moi ben
-GRASP_MIN_SUM = 0.0090  # tong q hai ngon >= nguong nay nghia la co cube chan giua
+# Cube 4cm: 2 ngon cham cube o q = 0.005 moi ben. gazebo_ros2_control dat vi tri khop truc tiep
+# (khong gioi han luc) nen chi can ep ngap > ~1mm la cube bi ban vang (da quan sat o 0.0 va 0.0035).
+# Dat diem dong sat diem cham de ep chi vai phan mm.
+FINGER_CLOSE = 0.0047
+# Tong q nho hon nguong nay nghia la 2 ngon dong qua sau (khong co cube giua). Cua so nay hep nen
+# chi dung de CANH BAO, khong huy pick.
+GRASP_MIN_SUM = 0.0085
 LIFT_DZ = 0.08
 
 class RobotSkills:
@@ -278,10 +283,7 @@ class RobotSkills:
         self._log_cube(object_name, "truoc khi kep")
         self.close_gripper()
         if not self._verify_grasp():
-            self.node.get_logger().warn(f"Co the da gap hut {object_name}")
-            self.open_gripper()
-            self._move_xyz(x, y, PICK_Z + LIFT_DZ)
-            return SkillStatus.FAILED
+            self.node.get_logger().warn(f"Canh bao: co the da gap hut {object_name} (tiep tuc nhac len)")
 
         st = self._move_xyz(x, y, PICK_Z + LIFT_DZ)
         time.sleep(0.5)
