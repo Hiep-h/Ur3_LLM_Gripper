@@ -50,10 +50,12 @@ MOVEIT_ERRORS = {
 
 
 # Cao do tool0 (base_link) khi gripper om vua cube 4cm / tha cube xuong ban.
-# Ngon gripper nam 0.104..0.164 duoi tool0 (xem urdf/simple_gripper.xacro):
-# PICK_Z = 0.17 -> ngon cao ~0.006..0.066, than gripper cach dinh cube (0.04) ~2.6cm.
-PICK_Z = 0.17
-PLACE_Z = 0.175
+# Ngon gripper dai 6cm, tam ngon nam 0.134 duoi tool0 -> day ngon = tool0_z - 0.164.
+# IK/dieu khien co the lech ~1cm, nen de day ngon cach ban >= ~2cm (da quan sat PICK_Z=0.17 lam day ngon
+# cham ban: ngon dinh xuong ban vi ma sat lon, khong khep duoc).
+# Cube nam tren mieng zone day 7.5mm: cube cao tu 0.0075 den 0.0475.
+PICK_Z = 0.19
+PLACE_Z = 0.195
 PRE_GRASP_DZ = 0.05
 # Ngon gripper: mat trong o +-(0.015 + q). Cube 4cm (nua be rong 0.02) cham ngon o q = 0.005.
 FINGER_OPEN = 0.04
