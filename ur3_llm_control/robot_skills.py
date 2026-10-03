@@ -329,6 +329,7 @@ class RobotSkills:
         (dung khi kep/tha vi lech 1cm la du de chi 1 ngon cham cube)."""
         tx, ty, tz = x, y, z
         st = SkillStatus.FAILED
+        recovered = False
         for attempt in range(3 if precise else 1):
             joints = self._ik_joints(tx, ty, tz)
             st = SkillStatus.FAILED
@@ -338,6 +339,15 @@ class RobotSkills:
             if st != SkillStatus.SUCCESS:
                 # du phong: dat muc tieu theo pose
                 st = self._move_to_pose(tx, ty, tz, *GRASP_ORIENTATION)
+            if st != SkillStatus.SUCCESS and not recovered:
+                # Chuyen dong hong giua chung (vi du CONTROL_FAILED): ve home roi thu lai mot lan
+                self.node.get_logger().warn("Chuyen dong that bai, ve home roi thu lai mot lan")
+                recovered = True
+                if self.home() == SkillStatus.SUCCESS:
+                    st = self._move_to_pose(tx, ty, tz, *GRASP_ORIENTATION)
+                    joints = self._ik_joints(tx, ty, tz)
+                    if st != SkillStatus.SUCCESS and joints:
+                        st = self._move_to_joint(joints, label=f"IK goal (thu lai) x={tx:.3f} y={ty:.3f} z={tz:.3f}")
             if st != SkillStatus.SUCCESS or not precise:
                 return st
             time.sleep(0.4)
