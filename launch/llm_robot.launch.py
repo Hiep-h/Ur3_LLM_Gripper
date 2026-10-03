@@ -40,8 +40,8 @@ def _box_sdf(name, size_xyz, rgba, static=True, physical=True):
           </friction>
           <contact>
             <ode>
-              <kp>1000000.0</kp>
-              <kd>100.0</kd>
+              <kp>100000.0</kp>
+              <kd>10.0</kd>
               <max_vel>0.01</max_vel>
               <min_depth>0.001</min_depth>
             </ode>
@@ -51,10 +51,10 @@ def _box_sdf(name, size_xyz, rgba, static=True, physical=True):
     gravity = "true" if physical else "false"
     inertial_xml = f"""
       <inertial>
-        <mass>0.05</mass>
+        <mass>0.15</mass>
         <inertia>
-          <ixx>0.000013</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.000013</iyy><iyz>0</iyz><izz>0.000013</izz>
+          <ixx>0.00004</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.00004</iyy><iyz>0</iyz><izz>0.00004</izz>
         </inertia>
       </inertial>""" if physical else ""
 
@@ -66,8 +66,8 @@ def _box_sdf(name, size_xyz, rgba, static=True, physical=True):
       <gravity>{gravity}</gravity>
       {inertial_xml}
       <velocity_decay>
-        <linear>0.1</linear>
-        <angular>0.8</angular>
+        <linear>0.5</linear>
+        <angular>2.0</angular>
       </velocity_decay>
       <visual name="visual">
         <geometry><box><size>{sx} {sy} {sz}</size></box></geometry>
@@ -99,26 +99,18 @@ def generate_launch_description():
     }
     scene = load_yaml(os.path.join(pkg_share, "config", "scene.yaml"))
 
-    # Generate SRDF tu template xacro
+    # Generate SRDF tu template xacro, chen disable_collisions cho gripper
     srdf_xacro = os.path.join(ur_share, "srdf", "ur.srdf.xacro")
-    robot_description_semantic = {
-        "robot_description_semantic": ParameterValue(
-            Command(["xacro ", srdf_xacro, " name:=ur3_with_gripper"]), value_type=str
-        )
-    }
+    import subprocess
+    _srdf_text = subprocess.check_output(["xacro", srdf_xacro, "name:=ur"], text=True)
+    _extra = "".join(f'  <disable_collisions link1="{a}" link2="{b}" reason="Gripper"/>\n' for a, b in [("gripper_base_link","forearm_link"),("gripper_base_link","wrist_1_link"),("gripper_base_link","wrist_2_link"),("gripper_base_link","wrist_3_link"),("left_finger_link","wrist_3_link"),("right_finger_link","wrist_3_link"),("left_finger_link","gripper_base_link"),("right_finger_link","gripper_base_link"),("left_finger_link","right_finger_link")])
+    robot_description_semantic = {"robot_description_semantic": _srdf_text.replace("</robot>", _extra + "</robot>")}
 
     kinematics_yaml = load_yaml(os.path.join(ur_share, "config", "kinematics.yaml"))
-    # kinematics.yaml dung group "ur_manipulator"; SRDF cua chung ta tao group
-    # "ur3_with_gripper_manipulator" (name:=ur3_with_gripper). Phai remap dung ten.
-    _kin_inner = (kinematics_yaml.get("/**", {})
-                  .get("ros__parameters", {})
-                  .get("robot_description_kinematics", {}))
-    _solver_cfg = _kin_inner.get("ur_manipulator", {})
-    robot_description_kinematics = {
-        "robot_description_kinematics": {
-            "ur3_with_gripper_manipulator": _solver_cfg
-        }
-    }
+    # kinematics.yaml cua Humble co dang file tham so ROS (/** -> ros__parameters -> robot_description_kinematics),
+    # nen phai lay phan ben trong ra, neu khong MoveIt khong tim thay bo giai IK.
+    kinematics_yaml = kinematics_yaml.get("/**", {}).get("ros__parameters", {}).get("robot_description_kinematics", kinematics_yaml)
+    robot_description_kinematics = {"robot_description_kinematics": kinematics_yaml}
 
     ompl_planning_yaml = load_yaml(os.path.join(ur_share, "config", "ompl_planning.yaml"))
     ompl_planning_pipeline_config = {
