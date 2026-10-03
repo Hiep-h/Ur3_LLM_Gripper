@@ -186,7 +186,7 @@ class RobotSkills:
             f"Kiem tra gap: left={ql:.4f} right={qr:.4f} tong={total:.4f} (co cube neu >= {GRASP_MIN_SUM})")
         return GRASP_MIN_SUM <= total < 0.07
 
-    def _move_to_joint(self, joint_dict: dict, label: str = "joint goal (home)") -> SkillStatus:
+    def _move_to_joint(self, joint_dict: dict, label: str = "joint goal (home)", tol: float = 0.01) -> SkillStatus:
         if not self._move_client.wait_for_server(timeout_sec=20.0):
             return SkillStatus.FAILED
 
@@ -203,8 +203,8 @@ class RobotSkills:
             jc = JointConstraint()
             jc.joint_name = jname
             jc.position = float(jval)
-            jc.tolerance_above = 0.01
-            jc.tolerance_below = 0.01
+            jc.tolerance_above = tol
+            jc.tolerance_below = tol
             jc.weight = 1.0
             c.joint_constraints.append(jc)
         goal.request.goal_constraints.append(c)
@@ -316,14 +316,43 @@ class RobotSkills:
         sol = dict(zip(res.solution.joint_state.name, res.solution.joint_state.position))
         return {jn: sol[jn] for jn in HOME_JOINTS if jn in sol}
 
-    def _move_xyz(self, x, y, z) -> SkillStatus:
-        joints = self._ik_joints(x, y, z)
-        if joints:
-            st = self._move_to_joint(joints, label=f"IK goal x={x:.3f} y={y:.3f} z={z:.3f}")
-            if st == SkillStatus.SUCCESS:
+    def _tool_xyz(self):
+        try:
+            t = self.tf_buffer.lookup_transform(self.base_frame, self.ee_link, rclpy.time.Time())
+            p = t.transform.translation
+            return p.x, p.y, p.z
+        except Exception:
+            return None
+
+    def _move_xyz(self, x, y, z, precise: bool = False) -> SkillStatus:
+        """Di chuyen tool0 toi (x, y, z). precise=True: do lai vi tri that va bu them neu lech > 4mm
+        (dung khi kep/tha vi lech 1cm la du de chi 1 ngon cham cube)."""
+        tx, ty, tz = x, y, z
+        st = SkillStatus.FAILED
+        for attempt in range(3 if precise else 1):
+            joints = self._ik_joints(tx, ty, tz)
+            st = SkillStatus.FAILED
+            if joints:
+                st = self._move_to_joint(joints, label=f"IK goal x={tx:.3f} y={ty:.3f} z={tz:.3f}",
+                                         tol=0.002 if precise else 0.01)
+            if st != SkillStatus.SUCCESS:
+                # du phong: dat muc tieu theo pose
+                st = self._move_to_pose(tx, ty, tz, *GRASP_ORIENTATION)
+            if st != SkillStatus.SUCCESS or not precise:
                 return st
-        # du phong: dat muc tieu theo pose
-        return self._move_to_pose(x, y, z, *GRASP_ORIENTATION)
+            time.sleep(0.4)
+            cur = self._tool_xyz()
+            if cur is None:
+                return st
+            ex, ey, ez = x - cur[0], y - cur[1], z - cur[2]
+            err = (ex * ex + ey * ey + ez * ez) ** 0.5
+            self.node.get_logger().info(
+                f"DEBUG sai so vi tri tool0 (lan {attempt + 1}): "
+                f"dx={ex * 1000:.1f}mm dy={ey * 1000:.1f}mm dz={ez * 1000:.1f}mm")
+            if err < 0.004:
+                return st
+            tx, ty, tz = tx + ex, ty + ey, tz + ez  # bu sai so
+        return st
 
     def pick(self, object_name: str) -> SkillStatus:
         # Ve home truoc khi quan sat de tay robot khong che camera
@@ -354,7 +383,7 @@ class RobotSkills:
         self._report_moved(before, "sau pre-grasp")
         if st != SkillStatus.SUCCESS:
             return st
-        st = self._move_xyz(x, y, PICK_Z)
+        st = self._move_xyz(x, y, PICK_Z, precise=True)
         self._log_links("o do cao kep (grasp)")
         self._report_moved(before, "sau khi ha xuong grasp")
         if st != SkillStatus.SUCCESS:
@@ -389,7 +418,7 @@ class RobotSkills:
         st = self._move_xyz(x, y, PLACE_Z + PRE_GRASP_DZ)
         if st != SkillStatus.SUCCESS:
             return st
-        st = self._move_xyz(x, y, PLACE_Z)
+        st = self._move_xyz(x, y, PLACE_Z, precise=True)
         if st != SkillStatus.SUCCESS:
             return st
 
