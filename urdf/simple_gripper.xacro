@@ -101,13 +101,13 @@
   <gazebo reference="left_finger_link">
     <mu1>50.0</mu1><mu2>50.0</mu2>
     <kp>100000.0</kp><kd>10.0</kd>
-    <minDepth>0.001</minDepth><maxVel>0.01</maxVel>
+    <minDepth>0.0001</minDepth><maxVel>0.01</maxVel>
     <material>Gazebo/DarkGrey</material>
   </gazebo>
   <gazebo reference="right_finger_link">
     <mu1>50.0</mu1><mu2>50.0</mu2>
     <kp>100000.0</kp><kd>10.0</kd>
-    <minDepth>0.001</minDepth><maxVel>0.01</maxVel>
+    <minDepth>0.0001</minDepth><maxVel>0.01</maxVel>
     <material>Gazebo/DarkGrey</material>
   </gazebo>
 
