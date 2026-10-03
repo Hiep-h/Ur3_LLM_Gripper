@@ -47,6 +47,10 @@ MOVEIT_ERRORS = {
 PICK_Z = 0.17
 PLACE_Z = 0.175
 PRE_GRASP_DZ = 0.05
+# Ngon gripper: mat trong o +-(0.015 + q). Cube 4cm (nua be rong 0.02) cham ngon o q = 0.005.
+FINGER_OPEN = 0.04
+FINGER_CLOSE = 0.004   # ep nhe ~1mm moi ben
+GRASP_MIN_Q = 0.0043   # q trung binh >= nguong nay nghia la co cube chan giua
 LIFT_DZ = 0.08
 
 class RobotSkills:
@@ -91,10 +95,13 @@ class RobotSkills:
         return res is not None and res.result.error_code == FollowJointTrajectory.Result.SUCCESSFUL
 
     def open_gripper(self) -> bool:
-        return self._send_gripper(0.04)
+        return self._send_gripper(FINGER_OPEN, duration_sec=2.0)
 
     def close_gripper(self) -> bool:
-        return self._send_gripper(0.0)
+        # Dong cham toi FINGER_CLOSE (chi ep nhe vao cube), KHONG dong ve 0:
+        # gazebo_ros2_control dat vi tri khop truc tiep nen dong ve 0 se ep ngon ngam sau
+        # vao cube va ban cube ra ngoai.
+        return self._send_gripper(FINGER_CLOSE, duration_sec=3.0)
 
     def _on_joint_state(self, msg: JointState):
         for name, pos in zip(msg.name, msg.position):
@@ -102,11 +109,15 @@ class RobotSkills:
                 self._finger_pos[name] = pos
 
     def _verify_grasp(self) -> bool:
-        """Cube 4cm chan khong cho 2 ngon khep het (q ~ 0.005); q ~ 0 nghia la gap hut."""
-        time.sleep(0.5)
+        """Co cube giua 2 ngon: ngon bi chan o q ~ 0.005. Khong co cube: ngon dong toi FINGER_CLOSE."""
+        time.sleep(0.8)
         if len(self._finger_pos) < 2:
             return True  # khong co du lieu -> khong ket luan la hut
-        return all(0.002 < p < 0.035 for p in self._finger_pos.values())
+        qs = list(self._finger_pos.values())
+        self.node.get_logger().info(
+            f"Kiem tra gap: left={self._finger_pos.get('left_finger_joint', 0):.4f} "
+            f"right={self._finger_pos.get('right_finger_joint', 0):.4f} (co cube neu >= {GRASP_MIN_Q})")
+        return all(GRASP_MIN_Q <= q < 0.035 for q in qs)
 
     def _move_to_joint(self, joint_dict: dict) -> SkillStatus:
         if not self._move_client.wait_for_server(timeout_sec=20.0):
