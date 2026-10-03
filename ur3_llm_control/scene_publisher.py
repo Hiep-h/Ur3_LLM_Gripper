@@ -76,7 +76,10 @@ class ScenePublisher(Node):
         table = self.scene_cfg["table"]
         cx, cy, cz = table["center"]
         sx, sy, sz = table["size"]
-        objects = [make_box("work_table", cx, cy, cz, sx, sy, sz)]
+        # Ha hop ban trong MoveIt xuong 1cm so voi ban that trong Gazebo: de robot dat dung mat ban
+        # (z = 0) khong bi coi la dang va cham (loi "contact between work_table and base_link_inertia").
+        # Chi anh huong planning scene, khong doi vat ly trong Gazebo.
+        objects = [make_box("work_table", cx, cy, cz - 0.01, sx, sy, sz)]
 
         scene = PlanningScene()
         scene.is_diff = True
