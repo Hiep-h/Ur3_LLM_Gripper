@@ -1,0 +1,12 @@
+student_name: "Vu Van Hiep"
+student_id: "230200742"
+
+personalization:
+  formula: "P = XX mod 6, XX = 2 chu so cuoi MSSV"
+  xx: 42
+  p: 0
+
+zone_mapping:
+  zone_a: red_cube
+  zone_b: yellow_cube
+  zone_c: blue_cube

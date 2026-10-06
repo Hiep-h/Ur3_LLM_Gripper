@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# ROS 2 & Colcon build artifacts
+build/
+install/
+log/
+
+# IDE & Editor settings
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Temporary runtime files
+/tmp/
+*.sdf

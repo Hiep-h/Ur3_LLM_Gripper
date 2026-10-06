@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ur">
+
+  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
+
+  <link name="world"/>
+
+  <xacro:ur_robot
+    name="ur3"
+    tf_prefix=""
+    parent="world"
+    joint_limits_parameters_file="$(find ur_description)/config/ur3/joint_limits.yaml"
+    kinematics_parameters_file="$(find ur_description)/config/ur3/default_kinematics.yaml"
+    physical_parameters_file="$(find ur_description)/config/ur3/physical_parameters.yaml"
+    visual_parameters_file="$(find ur_description)/config/ur3/visual_parameters.yaml"
+    sim_gazebo="true"
+    initial_positions="${dict(shoulder_pan_joint=0.0,shoulder_lift_joint=-1.57,elbow_joint=-1.57,wrist_1_joint=-1.57,wrist_2_joint=1.57,wrist_3_joint=0.0)}">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:ur_robot>
+
+  <!-- Tat gravity cac link canh tay trong thoi gian controller chua bat -->
+  <gazebo reference="base_link_inertia"><gravity>false</gravity></gazebo>
+  <gazebo reference="shoulder_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="upper_arm_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="forearm_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="wrist_1_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="wrist_2_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="wrist_3_link"><gravity>false</gravity></gazebo>
+  <gazebo reference="gripper_base_link"><gravity>false</gravity></gazebo>
+
+  <!-- Nối cơ khí simple_gripper vào tool0 -->
+  <xacro:include filename="simple_gripper.xacro"/>
+
+  <!-- Gộp 2 khớp gripper vào ros2_control duy nhất của robot -->
+  <ros2_control name="GripperControlOverride" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
+    <joint name="left_finger_joint">
+      <command_interface name="effort"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="right_finger_joint">
+      <command_interface name="effort"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- 1 plugin Gazebo ros2_control duy nhất cho toàn bộ hệ thống -->
+  <gazebo>
+    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+      <parameters>$(find ur3_llm_control)/config/gripper_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>

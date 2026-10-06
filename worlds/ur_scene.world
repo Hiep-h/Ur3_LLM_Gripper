@@ -1,0 +1,65 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="default">
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/gazebo</namespace>
+      </ros>
+      <update_rate>50.0</update_rate>
+    </plugin>
+
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <!-- Camera treo lơ lửng trên trần, KHÔNG CẦN CỘT CẮM VÀO BÀN -->
+    <model name="overhead_camera">
+      <static>true</static>
+      <pose>0.34 0 1.0 0 1.5708 0</pose>
+      <link name="camera_link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.05 0.05 0.03</size></box>
+          </geometry>
+          <material>
+            <ambient>0.1 0.1 0.1 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+          </material>
+        </visual>
+        <sensor name="overhead_cam_sensor" type="camera">
+          <camera>
+            <horizontal_fov>1.047</horizontal_fov>
+            <image>
+              <width>800</width>
+              <height>600</height>
+            </image>
+            <clip>
+              <near>0.05</near>
+              <far>5.0</far>
+            </clip>
+          </camera>
+          <always_on>true</always_on>
+          <update_rate>10</update_rate>
+          <visualize>false</visualize> <!-- Tắt tia nón trắng cho gọn mắt -->
+
+          <plugin name="overhead_camera_controller" filename="libgazebo_ros_camera.so">
+            <!-- Topic: /overhead_cam/image_raw va /overhead_cam/camera_info
+                 (khong dat <namespace>, tranh bi lap /overhead_cam/overhead_cam/...) -->
+            <camera_name>overhead_cam</camera_name>
+            <frame_name>overhead_cam_optical_frame</frame_name>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+
+  </world>
+</sdf>
